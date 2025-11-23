@@ -1,5 +1,5 @@
 const express = require('express');
-const { User, Order, OrderItem, ActivityLog } = require('../db');
+const { User, Order, OrderItem, OrderLog, ActivityLog } = require('../db');
 const { authenticateToken } = require('../middleware/auth');
 const { requireAdmin } = require('../middleware/adminAuth');
 const { logActivity } = require('../utils/activityLogger');
@@ -200,6 +200,43 @@ router.get('/orders/:id', async (req, res) => {
         }
 
         res.json(order);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Delete any order
+router.delete('/orders/:id', async (req, res) => {
+    try {
+        const adminId = req.user.id;
+        const { id } = req.params;
+
+        const order = await Order.findByPk(id, {
+            include: [
+                { model: OrderItem, as: 'Items' },
+                { model: OrderLog, as: 'History' },
+                { model: User, as: 'AssignedTakers' }
+            ]
+        });
+
+        if (!order) {
+            return res.status(404).json({ error: 'Order not found' });
+        }
+
+        // Remove related records first
+        await OrderItem.destroy({ where: { orderId: order.id } });
+        await OrderLog.destroy({ where: { orderId: order.id } });
+        await order.setAssignedTakers([]);
+
+        await order.destroy();
+
+        await logActivity(adminId, 'order_deleted', 'order', id, {
+            title: order.title,
+            makerId: order.makerId,
+            totalItems: order.Items?.length || 0
+        }, req.ip);
+
+        res.json({ message: 'Order deleted successfully' });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
