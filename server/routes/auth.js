@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { User } = require('../db');
 const { SECRET_KEY } = require('../middleware/auth');
+const { authenticateToken } = require('../middleware/auth');
 const { logActivity } = require('../utils/activityLogger');
 
 const router = express.Router();
@@ -73,6 +74,23 @@ router.post('/login', async (req, res) => {
                 isApproved: user.isApproved
             }
         });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Verify current session and return user profile
+router.get('/me', authenticateToken, async (req, res) => {
+    try {
+        const user = await User.findByPk(req.user.id, {
+            attributes: ['id', 'username', 'role', 'isApproved']
+        });
+
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        res.json({ user });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

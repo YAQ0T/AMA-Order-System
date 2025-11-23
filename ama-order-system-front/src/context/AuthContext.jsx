@@ -14,22 +14,41 @@ export const AuthProvider = ({ children }) => {
 
     useEffect(() => {
         console.log('AuthProvider useEffect running, token:', token);
-        try {
-            if (token) {
-                // Ideally verify token with backend here, for now just decoding or assuming valid if present
-                // For a real app, we'd have a /me endpoint
-                const savedUser = localStorage.getItem('user');
-                console.log('Saved user from localStorage:', savedUser);
-                if (savedUser) {
-                    setUser(JSON.parse(savedUser));
+
+        const verifySession = async () => {
+            try {
+                if (!token) {
+                    setUser(null);
+                    localStorage.removeItem('user');
+                    return;
                 }
+
+                const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Session verification failed');
+                }
+
+                const data = await response.json();
+                setUser(data.user);
+                localStorage.setItem('user', JSON.stringify(data.user));
+            } catch (error) {
+                console.error('Error verifying session:', error);
+                setUser(null);
+                setToken(null);
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+            } finally {
+                setLoading(false);
+                console.log('AuthProvider loading set to false');
             }
-        } catch (error) {
-            console.error('Error in AuthProvider useEffect:', error);
-        } finally {
-            setLoading(false);
-            console.log('AuthProvider loading set to false');
-        }
+        };
+
+        verifySession();
     }, [token]);
 
     const login = async (username, password) => {
