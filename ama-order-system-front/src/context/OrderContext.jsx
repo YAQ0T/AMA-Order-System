@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAuth } from './AuthContext';
+import { API_BASE_URL } from '../utils/api';
 
 const OrderContext = createContext();
 
@@ -13,7 +14,7 @@ export const OrderProvider = ({ children }) => {
   const fetchOrders = useCallback(async () => {
     if (!token) return;
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/orders`, {
+      const response = await fetch(`${API_BASE_URL}/api/orders`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (response.ok) {
@@ -28,7 +29,7 @@ export const OrderProvider = ({ children }) => {
   const fetchTakers = useCallback(async () => {
     if (!token || user?.role !== 'maker') return;
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/takers`, {
+      const response = await fetch(`${API_BASE_URL}/api/auth/takers`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (response.ok) {
@@ -52,7 +53,7 @@ export const OrderProvider = ({ children }) => {
 
   const createOrder = async (orderData, assignedTakerIds) => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/orders`, {
+      const response = await fetch(`${API_BASE_URL}/api/orders`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -78,7 +79,7 @@ export const OrderProvider = ({ children }) => {
 
   const updateOrderStatus = async (orderId, status) => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/orders/${orderId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/orders/${orderId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -99,7 +100,7 @@ export const OrderProvider = ({ children }) => {
 
   const updateOrderDetails = async (orderId, details) => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/orders/${orderId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/orders/${orderId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -122,7 +123,7 @@ export const OrderProvider = ({ children }) => {
 
   const deleteOrder = async (orderId) => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/orders/${orderId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/orders/${orderId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
