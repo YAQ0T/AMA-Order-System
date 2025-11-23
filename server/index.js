@@ -14,10 +14,12 @@ const PORT = process.env.PORT || 3003;
 app.use(cors());
 app.use(express.json());
 
-// Sync Database and seed admin
-sequelize.sync({ force: false }).then(async () => {
+// Sync Database (auto-migrate schema) and seed admin
+sequelize.sync({ alter: true }).then(async () => {
     console.log('Database synced');
     await seedAdmin();
+}).catch((error) => {
+    console.error('Failed to sync database:', error);
 });
 
 // Routes
