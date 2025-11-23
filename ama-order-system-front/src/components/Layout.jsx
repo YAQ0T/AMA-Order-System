@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { API_BASE_URL } from '../utils/api';
 
 const Layout = () => {
     const { user, logout, token } = useAuth();
@@ -50,7 +51,7 @@ const Layout = () => {
     const fetchNotifications = async () => {
         if (!token) return;
         try {
-            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/notifications`, {
+            const res = await fetch(`${API_BASE_URL}/api/notifications`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (res.ok) {
@@ -78,7 +79,7 @@ const Layout = () => {
                 applicationServerKey: 'BPi7aQAQ7GVUmK_Kcj3DOwVZXWru297dmOiDPslJ4dlIKVc-YecqwQXXmgzbqxr8US5HVxPh8y-pgkrHmJdYj9M'
             });
 
-            await fetch(`${import.meta.env.VITE_API_URL}/api/notifications/subscribe`, {
+            await fetch(`${API_BASE_URL}/api/notifications/subscribe`, {
                 method: 'POST',
                 body: JSON.stringify(subscription),
                 headers: {
@@ -121,7 +122,7 @@ const Layout = () => {
 
     const markAsRead = async (id) => {
         try {
-            await fetch(`${import.meta.env.VITE_API_URL}/api/notifications/${id}/read`, {
+            await fetch(`${API_BASE_URL}/api/notifications/${id}/read`, {
                 method: 'PUT',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -133,7 +134,7 @@ const Layout = () => {
 
     const markAllRead = async () => {
         try {
-            await fetch(`${import.meta.env.VITE_API_URL}/api/notifications/read-all`, {
+            await fetch(`${API_BASE_URL}/api/notifications/read-all`, {
                 method: 'PUT',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
