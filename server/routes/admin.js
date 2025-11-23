@@ -148,7 +148,7 @@ router.get('/orders', async (req, res) => {
                 {
                     model: User,
                     as: 'Maker',
-                    attributes: ['id', 'username']
+                    attributes: ['id', 'username', 'role']
                 },
                 {
                     model: User,
@@ -180,7 +180,7 @@ router.get('/orders/:id', async (req, res) => {
                 {
                     model: User,
                     as: 'Maker',
-                    attributes: ['id', 'username']
+                    attributes: ['id', 'username', 'role']
                 },
                 {
                     model: User,

@@ -16,6 +16,7 @@ const MakerDashboard = () => {
     const [editSelectedTakers, setEditSelectedTakers] = useState([]);
     const [expandedHistoryId, setExpandedHistoryId] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
+    const [searchDate, setSearchDate] = useState('');
 
     const handleAddItem = () => {
         setItems([...items, { name: '', quantity: 1 }]);
@@ -100,8 +101,10 @@ const MakerDashboard = () => {
         const searchLower = searchTerm.toLowerCase();
         const matchesTitle = (order.title || '').toLowerCase().includes(searchLower);
         const matchesDesc = (order.description || '').toLowerCase().includes(searchLower);
-        const matchesDate = new Date(order.createdAt).toLocaleDateString().includes(searchLower);
-        return matchesTitle || matchesDesc || matchesDate;
+        const matchesDateText = new Date(order.createdAt).toLocaleDateString().includes(searchLower);
+        const normalizedCreated = new Date(order.createdAt).toISOString().slice(0, 10);
+        const matchesDateFilter = searchDate ? normalizedCreated === searchDate : true;
+        return (matchesTitle || matchesDesc || matchesDateText) && matchesDateFilter;
     });
 
     return (
@@ -204,16 +207,25 @@ const MakerDashboard = () => {
             )}
 
             <div style={{ marginTop: '3rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', gap: '1rem', flexWrap: 'wrap' }}>
                     <h2>Order History</h2>
-                    <input
-                        type="text"
-                        placeholder="Search orders..."
-                        className="input-field"
-                        style={{ width: '250px' }}
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
+                    <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                        <input
+                            type="text"
+                            placeholder="Search orders..."
+                            className="input-field"
+                            style={{ width: '220px' }}
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                        <input
+                            type="date"
+                            className="input-field"
+                            value={searchDate}
+                            onChange={(e) => setSearchDate(e.target.value)}
+                            style={{ width: '180px' }}
+                        />
+                    </div>
                 </div>
                 <div style={{ display: 'grid', gap: '1rem' }}>
                     {filteredOrders.length === 0 ? (
@@ -239,12 +251,15 @@ const MakerDashboard = () => {
                                             <span style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>{order.title || 'Untitled Order'}</span>
                                         )}
                                     </div>
-                                    <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                                    <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
                                         <span style={{
                                             color: order.status === 'completed' ? '#34d399' : order.status === 'in-progress' ? '#fbbf24' : '#94a3b8',
                                             textTransform: 'capitalize'
                                         }}>
                                             {order.status}
+                                        </span>
+                                        <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+                                            {new Date(order.createdAt).toLocaleDateString()}
                                         </span>
                                         {editingOrderId !== order.id && (
                                             <>

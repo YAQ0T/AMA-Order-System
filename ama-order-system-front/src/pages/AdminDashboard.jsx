@@ -25,6 +25,8 @@ const AdminDashboard = () => {
     const [editTakers, setEditTakers] = useState([]);
     const [orderLogs, setOrderLogs] = useState({});
     const [logVisibility, setLogVisibility] = useState({});
+    const [orderSearchTerm, setOrderSearchTerm] = useState('');
+    const [orderDateFilter, setOrderDateFilter] = useState('');
 
     // Fetch stats
     const fetchStats = async () => {
@@ -362,6 +364,19 @@ const AdminDashboard = () => {
         }
     };
 
+    const filteredOrders = orders.filter(order => {
+        const searchLower = orderSearchTerm.toLowerCase();
+        const normalizedDate = new Date(order.createdAt).toISOString().slice(0, 10);
+        const matchesDate = orderDateFilter ? normalizedDate === orderDateFilter : true;
+        const matchesText =
+            (order.title || '').toLowerCase().includes(searchLower) ||
+            (order.description || '').toLowerCase().includes(searchLower) ||
+            (order.Maker?.username || '').toLowerCase().includes(searchLower) ||
+            (order.AssignedTakers || []).some(t => t.username.toLowerCase().includes(searchLower));
+
+        return matchesText && matchesDate;
+    });
+
     return (
         <div className="container fade-in">
             <h1 style={{ marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -600,6 +615,23 @@ const AdminDashboard = () => {
             {activeTab === 'orders' && (
                 <div className="glass-panel" style={{ padding: '1.5rem' }}>
                     <h2 style={{ marginBottom: '1rem' }}>All Orders</h2>
+                    <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+                        <input
+                            type="text"
+                            className="input-field"
+                            placeholder="Search by title, maker, or taker"
+                            value={orderSearchTerm}
+                            onChange={(e) => setOrderSearchTerm(e.target.value)}
+                            style={{ width: '240px' }}
+                        />
+                        <input
+                            type="date"
+                            className="input-field"
+                            value={orderDateFilter}
+                            onChange={(e) => setOrderDateFilter(e.target.value)}
+                            style={{ width: '180px' }}
+                        />
+                    </div>
                     <div className="glass-panel" style={{ padding: '1rem', marginBottom: '1.5rem' }}>
                         <h3>Create Order</h3>
                         <div style={{ display: 'grid', gap: '1rem', marginTop: '0.75rem' }}>
@@ -685,7 +717,7 @@ const AdminDashboard = () => {
                         <p>Loading...</p>
                     ) : (
                         <div style={{ display: 'grid', gap: '1rem' }}>
-                            {orders.map(order => {
+                            {filteredOrders.map(order => {
                                 const isExpanded = expandedOrderId === order.id;
                                 return (
                                     <div key={order.id} className="glass-panel" style={{ padding: '1rem' }}>
