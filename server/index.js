@@ -14,8 +14,12 @@ const PORT = process.env.PORT || 3003;
 app.use(cors());
 app.use(express.json());
 
-// Sync Database (auto-migrate schema) and seed admin
-sequelize.sync({ alter: true }).then(async () => {
+// Sync Database and seed admin
+// Note: using `alter: true` with SQLite can fail when foreign key constraints
+// are present, because it attempts to recreate tables that other tables
+// reference. Rely on the existing schema instead of automatic alters to avoid
+// those constraint errors during startup.
+sequelize.sync().then(async () => {
     console.log('Database synced');
     await seedAdmin();
 }).catch((error) => {
