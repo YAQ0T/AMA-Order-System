@@ -11,6 +11,7 @@ const AdminDashboard = () => {
     const [orders, setOrders] = useState([]);
     const [logs, setLogs] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [expandedOrderId, setExpandedOrderId] = useState(null);
 
     // Fetch stats
     const fetchStats = async () => {
@@ -24,6 +25,31 @@ const AdminDashboard = () => {
             }
         } catch (err) {
             console.error('Failed to fetch stats', err);
+        }
+    };
+
+    // Delete order
+    const deleteOrder = async (orderId) => {
+        if (!confirm('Are you sure you want to delete this order? This action cannot be undone.')) {
+            return;
+        }
+
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/admin/orders/${orderId}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (res.ok) {
+                alert('Order deleted successfully');
+                fetchOrders();
+            } else {
+                const data = await res.json();
+                alert(data.error || 'Failed to delete order');
+            }
+        } catch (err) {
+            console.error('Failed to delete order', err);
+            alert('Failed to delete order');
         }
     };
 
@@ -409,36 +435,79 @@ const AdminDashboard = () => {
                         <p>Loading...</p>
                     ) : (
                         <div style={{ display: 'grid', gap: '1rem' }}>
-                            {orders.map(order => (
-                                <div key={order.id} className="glass-panel" style={{ padding: '1rem' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                                        <div>
-                                            <span style={{ fontWeight: 'bold' }}>Order #{order.id}</span>
-                                            {' - '}
-                                            <span style={{ color: 'var(--text-muted)' }}>
-                                                by {order.Maker?.username}
-                                            </span>
+                            {orders.map(order => {
+                                const isExpanded = expandedOrderId === order.id;
+                                return (
+                                    <div key={order.id} className="glass-panel" style={{ padding: '1rem' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', gap: '1rem', alignItems: 'center' }}>
+                                            <div>
+                                                <span style={{ fontWeight: 'bold' }}>Order #{order.id}</span>
+                                                {' - '}
+                                                <span style={{ color: 'var(--text-muted)' }}>
+                                                    by {order.Maker?.username}
+                                                </span>
+                                            </div>
+                                            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                                                <span style={{
+                                                    padding: '0.25rem 0.75rem',
+                                                    borderRadius: '12px',
+                                                    fontSize: '0.85rem',
+                                                    background: getStatusColor(order.status),
+                                                    color: 'white'
+                                                }}>
+                                                    {order.status}
+                                                </span>
+                                                <button
+                                                    className="btn-secondary"
+                                                    onClick={() => setExpandedOrderId(isExpanded ? null : order.id)}
+                                                >
+                                                    {isExpanded ? 'Hide Details' : 'View Details'}
+                                                </button>
+                                            </div>
                                         </div>
-                                        <span style={{
-                                            padding: '0.25rem 0.75rem',
-                                            borderRadius: '12px',
-                                            fontSize: '0.85rem',
-                                            background: getStatusColor(order.status),
-                                            color: 'white'
-                                        }}>
-                                            {order.status}
-                                        </span>
-                                    </div>
-                                    <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-                                        {order.Items?.length || 0} items • Created {new Date(order.createdAt).toLocaleDateString()}
-                                    </div>
-                                    {order.AssignedTakers && order.AssignedTakers.length > 0 && (
-                                        <div style={{ marginTop: '0.5rem', fontSize: '0.9rem' }}>
-                                            Assigned to: {order.AssignedTakers.map(t => t.username).join(', ')}
+                                        <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+                                            {order.Items?.length || 0} items • Created {new Date(order.createdAt).toLocaleDateString()}
                                         </div>
-                                    )}
-                                </div>
-                            ))}
+                                        {order.AssignedTakers && order.AssignedTakers.length > 0 && (
+                                            <div style={{ marginTop: '0.5rem', fontSize: '0.9rem' }}>
+                                                Assigned to: {order.AssignedTakers.map(t => t.username).join(', ')}
+                                            </div>
+                                        )}
+
+                                        {isExpanded && (
+                                            <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--glass-border)' }}>
+                                                <div style={{ marginBottom: '0.5rem', color: 'var(--text-muted)' }}>
+                                                    {order.description || 'No description provided.'}
+                                                </div>
+                                                <div style={{ display: 'grid', gap: '0.5rem' }}>
+                                                    <div>
+                                                        <strong>Items:</strong>
+                                                        <ul style={{ margin: '0.5rem 0 0 1rem', padding: 0 }}>
+                                                            {(order.Items || []).map(item => (
+                                                                <li key={`${order.id}-${item.name}`} style={{ color: 'var(--text-muted)' }}>
+                                                                    {item.name} - Qty: {item.quantity}
+                                                                </li>
+                                                            ))}
+                                                            {(order.Items || []).length === 0 && (
+                                                                <li style={{ color: 'var(--text-muted)' }}>No items listed</li>
+                                                            )}
+                                                        </ul>
+                                                    </div>
+                                                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+                                                        <span>Created: {new Date(order.createdAt).toLocaleString()}</span>
+                                                        <span>Updated: {new Date(order.updatedAt).toLocaleString()}</span>
+                                                    </div>
+                                                    <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                                                        <button className="btn-danger" onClick={() => deleteOrder(order.id)}>
+                                                            Delete Order
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
                         </div>
                     )}
                 </div>
