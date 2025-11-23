@@ -13,6 +13,7 @@ const OrderItem = require('./models/OrderItem')(sequelize);
 const OrderLog = require('./models/OrderLog')(sequelize);
 const Notification = require('./models/Notification')(sequelize);
 const PushSubscription = require('./models/PushSubscription')(sequelize);
+const ActivityLog = require('./models/ActivityLog')(sequelize);
 
 // Associations
 // User <-> Order (Maker)
@@ -43,4 +44,12 @@ Notification.belongsTo(User, { foreignKey: 'userId' });
 User.hasMany(PushSubscription, { foreignKey: 'userId' });
 PushSubscription.belongsTo(User, { foreignKey: 'userId' });
 
-module.exports = { sequelize, User, Order, OrderItem, OrderLog, Notification, PushSubscription };
+// User <-> ActivityLog
+User.hasMany(ActivityLog, { foreignKey: 'userId' });
+ActivityLog.belongsTo(User, { as: 'User', foreignKey: 'userId' });
+
+// User self-referential for approval
+User.belongsTo(User, { as: 'Approver', foreignKey: 'approvedBy' });
+User.hasMany(User, { as: 'ApprovedUsers', foreignKey: 'approvedBy' });
+
+module.exports = { sequelize, User, Order, OrderItem, OrderLog, Notification, PushSubscription, ActivityLog };

@@ -7,6 +7,8 @@ import Login from './pages/Login';
 import Signup from './pages/Signup';
 import MakerDashboard from './pages/MakerDashboard';
 import TakerDashboard from './pages/TakerDashboard';
+import AdminDashboard from './pages/AdminDashboard';
+import PendingApproval from './pages/PendingApproval';
 
 const ProtectedRoute = ({ children, allowedRole }) => {
   const { user, loading } = useAuth();
@@ -22,10 +24,18 @@ const HomeRedirect = () => {
   const { user, loading } = useAuth();
   if (loading) return <div>Loading...</div>;
   if (!user) return <Navigate to="/login" />;
-  return <Navigate to={user.role === 'maker' ? '/maker' : '/taker'} />;
+
+  // Redirect based on role
+  if (user.role === 'admin') return <Navigate to="/admin" />;
+  if (user.role === 'maker') return <Navigate to="/maker" />;
+  if (user.role === 'taker') return <Navigate to="/taker" />;
+
+  return <Navigate to="/login" />;
 };
 
 function App() {
+  console.log('App component rendering...');
+
   return (
     <AuthProvider>
       <OrderProvider>
@@ -33,9 +43,16 @@ function App() {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
+            <Route path="/pending-approval" element={<PendingApproval />} />
 
             <Route path="/" element={<Layout />}>
               <Route index element={<HomeRedirect />} />
+
+              <Route path="admin" element={
+                <ProtectedRoute allowedRole="admin">
+                  <AdminDashboard />
+                </ProtectedRoute>
+              } />
 
               <Route path="maker" element={
                 <ProtectedRoute allowedRole="maker">

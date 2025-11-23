@@ -13,10 +13,20 @@ const Login = () => {
         e.preventDefault();
         setError('');
         try {
-            await login(username, password);
-            navigate('/');
+            const result = await login(username, password);
+            // Check if user needs approval
+            if (result && result.requiresApproval) {
+                navigate('/pending-approval');
+            } else {
+                navigate('/');
+            }
         } catch (err) {
-            setError(err.message);
+            // Check if it's a pending approval error
+            if (err.message.includes('pending') || err.message.includes('approval')) {
+                navigate('/pending-approval');
+            } else {
+                setError(err.message);
+            }
         }
     };
 

@@ -5,6 +5,7 @@ const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const { sequelize } = require('./db');
+const { seedAdmin } = require('./utils/seedAdmin');
 
 const app = express();
 const PORT = process.env.PORT || 3003;
@@ -13,19 +14,22 @@ const PORT = process.env.PORT || 3003;
 app.use(cors());
 app.use(express.json());
 
-// Sync Database
-sequelize.sync({ force: false }).then(() => {
+// Sync Database and seed admin
+sequelize.sync({ force: false }).then(async () => {
     console.log('Database synced');
+    await seedAdmin();
 });
 
 // Routes
 const authRoutes = require('./routes/auth');
 const orderRoutes = require('./routes/orders');
 const notificationRoutes = require('./routes/notifications');
+const adminRoutes = require('./routes/admin');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Export for routes to use
 module.exports = { app, sequelize };

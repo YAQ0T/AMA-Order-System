@@ -13,14 +13,35 @@ module.exports = (sequelize) => {
             allowNull: false
         },
         role: {
-            type: DataTypes.ENUM('maker', 'taker'),
+            type: DataTypes.ENUM('maker', 'taker', 'admin'),
             allowNull: false
+        },
+        isApproved: {
+            type: DataTypes.BOOLEAN,
+            defaultValue: false,
+            allowNull: false
+        },
+        approvedBy: {
+            type: DataTypes.INTEGER,
+            allowNull: true,
+            references: {
+                model: 'Users',
+                key: 'id'
+            }
+        },
+        approvedAt: {
+            type: DataTypes.DATE,
+            allowNull: true
         }
     });
 
     User.beforeCreate(async (user) => {
         if (user.password) {
             user.password = await bcrypt.hash(user.password, 10);
+        }
+        // Auto-approve admin users
+        if (user.role === 'admin') {
+            user.isApproved = true;
         }
     });
 

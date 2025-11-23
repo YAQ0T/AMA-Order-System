@@ -10,6 +10,7 @@ const Layout = () => {
     const unreadCount = notifications.filter(n => !n.isRead).length;
     const prevUnreadCountRef = React.useRef(0);
     const isFirstLoadRef = React.useRef(true);
+    const notificationRef = React.useRef(null);
 
     const playNotificationSound = () => {
         try {
@@ -64,6 +65,10 @@ const Layout = () => {
 
     const subscribeToPush = async () => {
         if (!('serviceWorker' in navigator)) return;
+        if (typeof Notification === 'undefined') {
+            console.log('Notification API not available');
+            return;
+        }
 
         try {
             if (Notification.permission !== 'granted') {
@@ -95,13 +100,30 @@ const Layout = () => {
             const interval = setInterval(fetchNotifications, 30000);
 
             // Subscribe if permission was previously granted without prompting the user
-            if (Notification.permission === 'granted') {
+            if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
                 subscribeToPush();
             }
 
             return () => clearInterval(interval);
         }
     }, [token]);
+
+    // Close notifications dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (notificationRef.current && !notificationRef.current.contains(event.target)) {
+                setShowNotifications(false);
+            }
+        };
+
+        if (showNotifications) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [showNotifications]);
 
     const markAsRead = async (id) => {
         try {
@@ -137,7 +159,7 @@ const Layout = () => {
                     {user ? (
                         <>
                             {/* Notification Bell */}
-                            <div style={{ position: 'relative' }}>
+                            <div ref={notificationRef} style={{ position: 'relative' }}>
                                 <button
                                     onClick={() => setShowNotifications(!showNotifications)}
                                     style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', position: 'relative' }}
@@ -168,13 +190,14 @@ const Layout = () => {
                                 {showNotifications && (
                                     <div className="glass-panel" style={{
                                         position: 'absolute',
-                                        top: '120%',
-                                        right: 0,
-                                        width: '350px',
-                                        maxHeight: '400px',
+                                        top: '180%',
+                                        left: '-15px',
+                                        width: '360px',
+                                        maxHeight: '390px',
                                         overflowY: 'auto',
                                         padding: '0',
                                         zIndex: 1000,
+                                        backgroundColor: '#0E1729',
                                         boxShadow: '0 10px 25px rgba(0,0,0,0.5)'
                                     }}>
                                         <div style={{ padding: '1rem', borderBottom: '1px solid var(--glass-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -215,9 +238,27 @@ const Layout = () => {
 
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                 <div style={{ textAlign: 'right' }}>
-                                    <div style={{ fontWeight: 'bold' }}>{user.username}</div>
+                                    <div style={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        {user.username}
+                                        {user.role === 'admin' && (
+                                            <span style={{
+                                                background: '#ec4899',
+                                                color: 'white',
+                                                fontSize: '0.7rem',
+                                                padding: '0.2rem 0.5rem',
+                                                borderRadius: '8px'
+                                            }}>
+                                                ADMIN
+                                            </span>
+                                        )}
+                                    </div>
                                     <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'capitalize' }}>{user.role}</div>
                                 </div>
+                                {user.role === 'admin' && (
+                                    <Link to="/admin" className="btn-primary" style={{ padding: '0.5rem 1rem', textDecoration: 'none' }}>
+                                        👑 Dashboard
+                                    </Link>
+                                )}
                                 <button onClick={logout} className="btn-secondary" style={{ padding: '0.5rem 1rem' }}>Logout</button>
                             </div>
                         </>

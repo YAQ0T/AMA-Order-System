@@ -3,18 +3,37 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { User } = require('../db');
 const { SECRET_KEY } = require('../middleware/auth');
+const { logActivity } = require('../utils/activityLogger');
 
 const router = express.Router();
 
 router.post('/register', async (req, res) => {
     try {
         const { username, password, role } = req.body;
-        const user = await User.create({ username, password, role });
-        res.status(201).json({ message: 'User created successfully' });
+
+        // Create user with isApproved=false (will be auto-approved for admin in beforeCreate hook)
+        const user = await User.create({
+            username,
+            password,
+            role,
+            isApproved: false // Explicitly set to false, will be overridden for admin
+        });
+
+        // Log the registration
+        await logActivity(user.id, 'user_registered', 'user', user.id, {
+            username: user.username,
+            role: user.role
+        }, req.ip);
+
+        res.status(201).json({
+            message: 'User created successfully',
+            requiresApproval: user.role !== 'admin'
+        });
     } catch (error) {
         res.status(400).json({ error: error.message });
     }
 });
+
 
 router.post('/login', async (req, res) => {
     try {
@@ -25,8 +44,35 @@ router.post('/login', async (req, res) => {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
 
-        const token = jwt.sign({ id: user.id, username: user.username, role: user.role }, SECRET_KEY, { expiresIn: '1h' });
-        res.json({ token, user: { id: user.id, username: user.username, role: user.role } });
+        // Check if user is approved (skip check for admin)
+        if (user.role !== 'admin' && !user.isApproved) {
+            return res.status(403).json({
+                error: 'Account pending admin approval',
+                requiresApproval: true
+            });
+        }
+
+        // Log successful login
+        await logActivity(user.id, 'user_login', 'user', user.id, {
+            username: user.username
+        }, req.ip);
+
+        const token = jwt.sign({
+            id: user.id,
+            username: user.username,
+            role: user.role,
+            isApproved: user.isApproved
+        }, SECRET_KEY, { expiresIn: '24h' });
+
+        res.json({
+            token,
+            user: {
+                id: user.id,
+                username: user.username,
+                role: user.role,
+                isApproved: user.isApproved
+            }
+        });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
