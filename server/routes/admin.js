@@ -205,6 +205,23 @@ router.get('/orders/:id', async (req, res) => {
     }
 });
 
+// Get change logs for a specific order
+router.get('/orders/:id/logs', async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const logs = await OrderLog.findAll({
+            where: { orderId: id },
+            include: [{ model: User, as: 'Editor', attributes: ['id', 'username'] }],
+            order: [['createdAt', 'DESC']]
+        });
+
+        res.json(logs);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Delete any order
 router.delete('/orders/:id', async (req, res) => {
     try {

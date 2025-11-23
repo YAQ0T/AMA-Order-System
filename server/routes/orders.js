@@ -8,8 +8,8 @@ const router = express.Router();
 // Create Order (Maker only)
 router.post('/', authenticateToken, async (req, res) => {
     try {
-        if (req.user.role !== 'maker') {
-            return res.status(403).json({ error: 'Only makers can create orders' });
+        if (!['maker', 'admin'].includes(req.user.role)) {
+            return res.status(403).json({ error: 'Only makers or admins can create orders' });
         }
 
         const { title, description, assignedTakerIds, items } = req.body;
@@ -93,6 +93,11 @@ router.get('/', authenticateToken, async (req, res) => {
                 include: includeOptions,
                 order: [['createdAt', 'DESC']]
             });
+        } else if (req.user.role === 'admin') {
+            orders = await Order.findAll({
+                include: includeOptions,
+                order: [['createdAt', 'DESC']]
+            });
         } else {
             // Takers see orders assigned to them
             const user = await User.findByPk(req.user.id, {
@@ -139,8 +144,13 @@ router.put('/:id', authenticateToken, async (req, res) => {
             return res.status(404).json({ error: 'Order not found' });
         }
 
-        // TODO (optional): authorization check
-        // e.g. only maker or assigned taker can edit
+        const isAdmin = req.user.role === 'admin';
+        const isMaker = order.makerId === req.user.id;
+        const isAssigned = (order.AssignedTakers || []).some(taker => taker.id === req.user.id);
+
+        if (!isAdmin && !isMaker && !isAssigned) {
+            return res.status(403).json({ error: 'Not authorized to edit this order' });
+        }
 
         // Handle Details Update (Title, Description, Items)
         if (title !== undefined || description !== undefined || items !== undefined || assignedTakerIds !== undefined) {
