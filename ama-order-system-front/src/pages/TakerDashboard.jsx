@@ -149,7 +149,7 @@ const TakerDashboard = () => {
                                     </div>
                                     <div style={{ fontSize: '1rem' }}>
                                         {order.Items && order.Items.length > 0 ? (
-                                            <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '0.5rem' }}>
+                                            <table className="order-items-table" style={{ width: '100%', borderCollapse: 'collapse', marginTop: '0.5rem' }}>
                                                 <thead>
                                                     <tr style={{ borderBottom: '1px solid var(--glass-border)', textAlign: 'left' }}>
                                                         <th style={{ padding: '0.5rem', color: 'var(--text-muted)' }}>Product</th>
@@ -159,8 +159,8 @@ const TakerDashboard = () => {
                                                 <tbody>
                                                     {order.Items.map(item => (
                                                         <tr key={item.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                                                            <td style={{ padding: '0.5rem' }}>{item.name}</td>
-                                                            <td style={{ padding: '0.5rem', textAlign: 'right' }}>{item.quantity}</td>
+                                                            <td className="item-name" style={{ padding: '0.5rem' }}>{item.name}</td>
+                                                            <td className="item-qty" style={{ padding: '0.5rem', textAlign: 'right' }}>{item.quantity}</td>
                                                         </tr>
                                                     ))}
                                                 </tbody>

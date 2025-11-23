@@ -7,7 +7,6 @@ const Layout = () => {
     const { user, logout, token } = useAuth();
     const [notifications, setNotifications] = useState([]);
     const [showNotifications, setShowNotifications] = useState(false);
-    const [showPermissionDialog, setShowPermissionDialog] = useState(false);
     const unreadCount = notifications.filter(n => !n.isRead).length;
     const prevUnreadCountRef = React.useRef(0);
     const isFirstLoadRef = React.useRef(true);
@@ -67,9 +66,7 @@ const Layout = () => {
         if (!('serviceWorker' in navigator)) return;
 
         try {
-            const permission = await Notification.requestPermission();
-            if (permission !== 'granted') {
-                console.log('Notification permission denied');
+            if (Notification.permission !== 'granted') {
                 return;
             }
 
@@ -97,28 +94,14 @@ const Layout = () => {
             fetchNotifications();
             const interval = setInterval(fetchNotifications, 30000);
 
-            // Check if we should show permission dialog
-            const hasAskedPermission = localStorage.getItem('notificationPermissionAsked');
-            if (!hasAskedPermission && 'Notification' in window) {
-                setShowPermissionDialog(true);
-            } else if (Notification.permission === 'granted') {
+            // Subscribe if permission was previously granted without prompting the user
+            if (Notification.permission === 'granted') {
                 subscribeToPush();
             }
 
             return () => clearInterval(interval);
         }
     }, [token]);
-
-    const handleEnableNotifications = async () => {
-        localStorage.setItem('notificationPermissionAsked', 'true');
-        setShowPermissionDialog(false);
-        await subscribeToPush();
-    };
-
-    const handleDismissNotifications = () => {
-        localStorage.setItem('notificationPermissionAsked', 'true');
-        setShowPermissionDialog(false);
-    };
 
     const markAsRead = async (id) => {
         try {
@@ -146,43 +129,6 @@ const Layout = () => {
 
     return (
         <div className="min-h-screen flex flex-col">
-            {/* Notification Permission Dialog */}
-            {showPermissionDialog && (
-                <div style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    background: 'rgba(0, 0, 0, 0.7)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 9999
-                }}>
-                    <div className="glass-panel" style={{
-                        padding: '2rem',
-                        maxWidth: '400px',
-                        textAlign: 'center',
-                        animation: 'fadeIn 0.3s ease-out'
-                    }}>
-                        <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🔔</div>
-                        <h2 style={{ marginBottom: '1rem' }}>Enable Notifications?</h2>
-                        <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>
-                            Get instant alerts when you receive new orders, even when the app is closed.
-                        </p>
-                        <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
-                            <button onClick={handleEnableNotifications} className="btn-primary">
-                                Enable Notifications
-                            </button>
-                            <button onClick={handleDismissNotifications} className="btn-secondary">
-                                Not Now
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
             <nav className="glass-panel" style={{ margin: '1rem', padding: '1rem 2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', zIndex: 50 }}>
                 <Link to="/" style={{ textDecoration: 'none', color: 'var(--text-main)', fontSize: '1.5rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <span>📦</span> AMA Order System
