@@ -59,6 +59,7 @@ router.post('/', authenticateToken, async (req, res) => {
         // Fetch complete order with items
         const completeOrder = await Order.findByPk(order.id, {
             include: [
+                { model: User, as: 'Maker', attributes: ['id', 'username', 'role'] },
                 { model: User, as: 'AssignedTakers', attributes: ['id', 'username'] },
                 { model: OrderItem, as: 'Items' }
             ]
@@ -76,6 +77,7 @@ router.get('/', authenticateToken, async (req, res) => {
     try {
         let orders;
         const includeOptions = [
+            { model: User, as: 'Maker', attributes: ['id', 'username', 'role'] },
             { model: User, as: 'AssignedTakers', attributes: ['id', 'username'] },
             {
                 model: OrderLog,
@@ -105,6 +107,7 @@ router.get('/', authenticateToken, async (req, res) => {
                     model: Order,
                     as: 'AssignedOrders',
                     include: [
+                        { model: User, as: 'Maker', attributes: ['id', 'username', 'role'] },
                         { model: OrderItem, as: 'Items' },
                         {
                             model: OrderLog,
@@ -135,6 +138,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
 
         const order = await Order.findByPk(req.params.id, {
             include: [
+                { model: User, as: 'Maker', attributes: ['id', 'username', 'role'] },
                 { model: OrderItem, as: 'Items' },
                 { model: User, as: 'AssignedTakers', attributes: ['id', 'username'] }
             ]
@@ -314,6 +318,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
         // Reload to get full data
         const updatedOrder = await Order.findByPk(order.id, {
             include: [
+                { model: User, as: 'Maker', attributes: ['id', 'username', 'role'] },
                 { model: User, as: 'AssignedTakers', attributes: ['id', 'username'] },
                 {
                     model: OrderLog,

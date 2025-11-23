@@ -61,8 +61,13 @@ const TakerDashboard = () => {
                         <p style={{ fontSize: '1.2rem', color: 'var(--text-muted)' }}>No active orders assigned to you.</p>
                     </div>
                 ) : (
-                    activeOrders.map(order => (
-                        <div key={order.id} className="glass-panel" style={{ padding: '1.5rem', borderLeft: `4px solid ${order.status === 'completed' ? '#34d399' : order.status === 'in-progress' ? '#fbbf24' : '#94a3b8'}` }}>
+                    activeOrders.map(order => {
+                        const isAdminOrder = order.Maker?.role === 'admin';
+                        const statusColor = order.status === 'completed' ? '#34d399' : order.status === 'in-progress' ? '#fbbf24' : '#94a3b8';
+                        const borderColor = isAdminOrder ? '#ef4444' : statusColor;
+
+                        return (
+                        <div key={order.id} className="glass-panel" style={{ padding: '1.5rem', borderLeft: `4px solid ${borderColor}` }}>
                             <div className="order-header" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                                     <span style={{ fontFamily: 'monospace', background: 'rgba(255,255,255,0.1)', padding: '0.2rem 0.5rem', borderRadius: '4px' }}>
@@ -71,6 +76,11 @@ const TakerDashboard = () => {
                                     <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
                                         {new Date(order.createdAt).toLocaleDateString()}
                                     </span>
+                                    {isAdminOrder && (
+                                        <span style={{ color: '#ef4444', fontWeight: '600', fontSize: '0.9rem' }}>
+                                            Admin Order
+                                        </span>
+                                    )}
                                 </div>
                                 <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                                     <select
@@ -174,8 +184,14 @@ const TakerDashboard = () => {
                                     )}
                                 </>
                             )}
+                                {order.Maker && (
+                                    <p style={{ marginTop: '0.75rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                                        Created by: <span style={{ color: isAdminOrder ? '#ef4444' : 'var(--text-main)' }}>{order.Maker.username}</span>
+                                    </p>
+                                )}
                         </div>
-                    ))
+                        );
+                    })
                 )}
             </div>
         </div>
