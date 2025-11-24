@@ -92,27 +92,49 @@ router.get('/', authenticateToken, async (req, res) => {
     try {
         const limit = Math.min(parseInt(req.query.limit, 10) || 20, 100);
         const offset = parseInt(req.query.offset, 10) || 0;
+        const includeHistory = req.query.includeHistory !== 'false';
+        const search = (req.query.search || '').trim();
+
+        const where = {};
+
+        if (req.query.status) {
+            where.status = req.query.status;
+        }
+
+        if (req.query.city) {
+            where.city = req.query.city;
+        }
+
+        if (search) {
+            where[Op.or] = [
+                { title: { [Op.iLike]: `%${search}%` } },
+                { description: { [Op.iLike]: `%${search}%` } }
+            ];
+        }
 
         const includeOptions = [
             { model: User, as: 'Maker', attributes: ['id', 'username', 'role'] },
             { model: User, as: 'AssignedTakers', attributes: ['id', 'username'], through: { attributes: [] } },
-            {
+            { model: OrderItem, as: 'Items', attributes: ['id', 'name', 'quantity'] }
+        ];
+
+        if (includeHistory) {
+            includeOptions.push({
                 model: OrderLog,
                 as: 'History',
                 attributes: ['id', 'previousDescription', 'newDescription', 'createdAt', 'changedBy'],
                 include: [{ model: User, as: 'Editor', attributes: ['id', 'username'] }],
                 separate: true,
                 order: [['createdAt', 'DESC']]
-            },
-            { model: OrderItem, as: 'Items', attributes: ['id', 'name', 'quantity'] }
-        ];
+            });
+        }
 
         let result;
 
         if (req.user.role === 'maker') {
             // Makers see orders they created
             result = await Order.findAndCountAll({
-                where: { makerId: req.user.id },
+                where: { ...where, makerId: req.user.id },
                 include: includeOptions,
                 order: [['createdAt', 'DESC']],
                 limit,
@@ -121,6 +143,7 @@ router.get('/', authenticateToken, async (req, res) => {
             });
         } else if (req.user.role === 'admin') {
             result = await Order.findAndCountAll({
+                where,
                 include: includeOptions,
                 order: [['createdAt', 'DESC']],
                 limit,
@@ -130,7 +153,7 @@ router.get('/', authenticateToken, async (req, res) => {
         } else {
             // Takers see orders assigned to them
             result = await Order.findAndCountAll({
-                where: { '$AssignedTakers.id$': req.user.id },
+                where: { ...where, '$AssignedTakers.id$': req.user.id },
                 include: includeOptions,
                 order: [['createdAt', 'DESC']],
                 limit,
