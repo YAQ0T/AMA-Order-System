@@ -20,8 +20,10 @@ router.get('/users', async (req, res) => {
         const where = {};
         if (role) where.role = role;
         if (isApproved !== undefined) where.isApproved = isApproved === 'true';
-        if (search) {
-            where.username = { [Op.like]: `%${search}%` };
+        const trimmedSearch = search?.trim();
+        if (trimmedSearch) {
+            // Use prefix matching to keep the query index-friendly
+            where.username = { [Op.like]: `${trimmedSearch}%` };
         }
 
         const users = await User.findAll({

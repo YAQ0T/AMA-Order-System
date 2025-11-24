@@ -36,7 +36,13 @@ module.exports = (sequelize) => {
         }
     }, {
         timestamps: true,
-        updatedAt: false // Only track creation time
+        updatedAt: false, // Only track creation time
+        indexes: [
+            { fields: ['userId'] },
+            { fields: ['action'] },
+            { fields: ['createdAt'] },
+            { fields: ['action', 'createdAt'] }
+        ]
     });
 
     return ActivityLog;
