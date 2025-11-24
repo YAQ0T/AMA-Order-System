@@ -2,20 +2,20 @@ import React, { useState } from 'react';
 import { useOrder } from '../context/OrderContext';
 
 const TakerDashboard = () => {
-    const { orders, updateOrderStatus, updateOrderDetails, fetchOrders } = useOrder();
+    const { orders, orderPagination, updateOrderStatus, updateOrderDetails, fetchOrders } = useOrder();
     const [isRefreshing, setIsRefreshing] = useState(false);
 
     // Auto-refresh orders every 15 seconds
     React.useEffect(() => {
         const interval = setInterval(() => {
-            fetchOrders();
+            fetchOrders({ limit: orderPagination.limit, offset: orderPagination.offset });
         }, 15000);
         return () => clearInterval(interval);
-    }, [fetchOrders]);
+    }, [fetchOrders, orderPagination.limit, orderPagination.offset]);
 
     const handleManualRefresh = async () => {
         setIsRefreshing(true);
-        await fetchOrders();
+        await fetchOrders({ limit: orderPagination.limit, offset: orderPagination.offset });
         setTimeout(() => setIsRefreshing(false), 500);
     };
 
