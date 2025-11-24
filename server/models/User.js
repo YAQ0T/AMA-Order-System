@@ -44,6 +44,13 @@ module.exports = (sequelize) => {
         indexes: [
             {
                 fields: ['role']
+            },
+            {
+                fields: ['isApproved']
+            },
+            {
+                unique: true,
+                fields: ['username']
             }
         ]
     });
