@@ -2,6 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { useOrder } from '../context/OrderContext';
 import { useAuth } from '../context/AuthContext';
+import { API_BASE_URL } from '../utils/api';
 
 // Simple Modal Component
 const ConfirmModal = ({ isOpen, onClose, onConfirm, title, message }) => {
@@ -258,11 +259,37 @@ const MakerDashboard = () => {
         const ordersToSend = orders
             .filter(o => o.status === 'archived' && o.city === bulkSendCity && selectedArchivedOrders.includes(o.id));
 
+        const updatedOrderIds = [];
+
         for (const order of ordersToSend) {
-            await updateOrderDetails(order.id, {
+            const success = await updateOrderDetails(order.id, {
                 status: 'pending',
-                assignedTakerIds: bulkSendTakers
+                assignedTakerIds: bulkSendTakers,
+                skipEmail: true // Avoid sending separate emails per order during bulk send
             });
+
+            if (success) {
+                updatedOrderIds.push(order.id);
+            }
+        }
+
+        // Send one consolidated email per taker
+        if (updatedOrderIds.length > 0 && bulkSendTakers.length > 0) {
+            try {
+                await fetch(`${API_BASE_URL}/api/orders/bulk-email`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        orderIds: updatedOrderIds,
+                        takerIds: bulkSendTakers
+                    })
+                });
+            } catch (err) {
+                console.error('Failed to send bulk emails', err);
+            }
         }
 
         setShowBulkSendModal(false);
