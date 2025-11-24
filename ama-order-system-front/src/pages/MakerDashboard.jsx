@@ -1,22 +1,120 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useOrder } from '../context/OrderContext';
+import { useAuth } from '../context/AuthContext';
+
+// Simple Modal Component
+const ConfirmModal = ({ isOpen, onClose, onConfirm, title, message }) => {
+    if (!isOpen) return null;
+    return (
+        <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.7)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 1000
+        }}>
+            <div className="glass-panel" style={{ padding: '2rem', maxWidth: '400px', width: '90%' }}>
+                <h3 style={{ marginBottom: '1rem' }}>{title}</h3>
+                <p style={{ marginBottom: '1.5rem', color: 'var(--text-muted)' }}>{message}</p>
+                <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+                    <button className="btn-secondary" onClick={onClose}>Cancel</button>
+                    <button className="btn-danger" onClick={onConfirm}>Delete</button>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 const MakerDashboard = () => {
     const { users, createOrder, orders, updateOrderDetails, deleteOrder } = useOrder();
+    const { token } = useAuth();
     const [title, setTitle] = useState('');
+    const [note, setNote] = useState('');
+    const [city, setCity] = useState('نابلس');
     const [items, setItems] = useState([{ name: '', quantity: 1 }]);
     const [selectedTakers, setSelectedTakers] = useState([]);
     const [showSuccess, setShowSuccess] = useState(false);
 
+    // Delete Modal State
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [orderToDelete, setOrderToDelete] = useState(null);
+
+    const handleDeleteClick = (order) => {
+        setOrderToDelete(order);
+        setShowDeleteModal(true);
+    };
+
+    const confirmDelete = async () => {
+        if (orderToDelete) {
+            await deleteOrder(orderToDelete.id);
+            setShowDeleteModal(false);
+            setOrderToDelete(null);
+        }
+    };
+
     // Edit State
     const [editingOrderId, setEditingOrderId] = useState(null);
     const [editTitle, setEditTitle] = useState('');
+    const [editCity, setEditCity] = useState('');
     const [editItems, setEditItems] = useState([]);
     const [editSelectedTakers, setEditSelectedTakers] = useState([]);
     const [expandedHistoryId, setExpandedHistoryId] = useState(null);
+
     const [searchTerm, setSearchTerm] = useState('');
     const [searchDate, setSearchDate] = useState('');
+
+    // Archiving & Bulk Send State
+    const [showArchived, setShowArchived] = useState(false);
+    const [selectedArchivedOrders, setSelectedArchivedOrders] = useState([]); // Array of order IDs
+    const [bulkSendCity, setBulkSendCity] = useState(null); // City currently being bulk sent
+    const [showBulkSendModal, setShowBulkSendModal] = useState(false);
+    const [bulkSendTakers, setBulkSendTakers] = useState([]);
+
+    // Product & Title Suggestions
+    const [productSuggestions, setProductSuggestions] = useState([]);
+    const [titleSuggestions, setTitleSuggestions] = useState([]);
+
+    const fetchProductSuggestions = async (query) => {
+        if (!query || query.length < 2) {
+            setProductSuggestions([]);
+            return;
+        }
+        try {
+            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3003'}/api/items/suggestions?q=${encodeURIComponent(query)}`);
+            if (response.ok) {
+                const data = await response.json();
+                setProductSuggestions(data);
+            }
+        } catch (error) {
+            console.error('Failed to fetch suggestions', error);
+        }
+    };
+
+    const fetchTitleSuggestions = async (query) => {
+        if (!query || query.length < 1) {
+            setTitleSuggestions([]);
+            return;
+        }
+        try {
+            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3003'}/api/orders/suggestions?q=${encodeURIComponent(query)}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                setTitleSuggestions(data);
+            }
+        } catch (error) {
+            console.error('Failed to fetch title suggestions', error);
+        }
+    };
+
+    const cities = ['نابلس', 'الخليل', 'جنين', 'طولكرم', 'بديا', 'قلقيليا', 'رامالله', 'بيت لحم', 'الداخل'];
 
     const handleAddItem = () => {
         setItems([...items, { name: '', quantity: 1 }]);
@@ -32,11 +130,29 @@ const MakerDashboard = () => {
         setItems(newItems);
     };
 
-    const handleSubmit = async (e) => {
+    const handleSubmit = async (e, isArchived = false) => {
         e.preventDefault();
-        const success = await createOrder({ description: title, title, items }, selectedTakers);
+
+        const validTakers = selectedTakers.map(id => Number(id)).filter(id => id > 0);
+
+        if (!isArchived && validTakers.length === 0) {
+            alert('Please assign at least one taker to the order.');
+            return;
+        }
+
+        const payload = {
+            description: note,
+            title,
+            items,
+            city,
+            status: isArchived ? 'archived' : 'pending'
+        };
+
+        const success = await createOrder(payload, validTakers);
         if (success) {
             setTitle('');
+            setNote('');
+            setCity('نابلس');
             setItems([{ name: '', quantity: 1 }]);
             setSelectedTakers([]);
             setShowSuccess(true);
@@ -47,12 +163,14 @@ const MakerDashboard = () => {
     const handleUpdate = async (orderId) => {
         const success = await updateOrderDetails(orderId, {
             title: editTitle,
+            city: editCity,
             items: editItems,
             assignedTakerIds: editSelectedTakers
         });
         if (success) {
             setEditingOrderId(null);
             setEditTitle('');
+            setEditCity('');
             setEditItems([]);
             setEditSelectedTakers([]);
         }
@@ -61,27 +179,22 @@ const MakerDashboard = () => {
     const startEditing = (order) => {
         setEditingOrderId(order.id);
         setEditTitle(order.title || '');
+        setEditCity(order.city || 'نابلس');
         setEditItems(order.Items ? order.Items.map(i => ({ name: i.name, quantity: i.quantity })) : []);
         setEditSelectedTakers(order.AssignedTakers ? order.AssignedTakers.map(t => t.id) : []);
     };
 
     const toggleTaker = (takerId) => {
+        const id = Number(takerId);
+        if (!id) return;
+
         setSelectedTakers(prev =>
-            prev.includes(takerId)
-                ? prev.filter(id => id !== takerId)
-                : [...prev, takerId]
+            prev.includes(id)
+                ? prev.filter(prevId => prevId !== id)
+                : [...prev, id]
         );
     };
 
-    const toggleEditTaker = (takerId) => {
-        setEditSelectedTakers(prev =>
-            prev.includes(takerId)
-                ? prev.filter(id => id !== takerId)
-                : [...prev, takerId]
-        );
-    };
-
-    // Edit Handlers
     const handleEditAddItem = () => {
         setEditItems([...editItems, { name: '', quantity: 1 }]);
     };
@@ -96,16 +209,97 @@ const MakerDashboard = () => {
         setEditItems(newItems);
     };
 
+    const toggleEditTaker = (takerId) => {
+        setEditSelectedTakers(prev =>
+            prev.includes(takerId)
+                ? prev.filter(id => id !== takerId)
+                : [...prev, takerId]
+        );
+    };
+
+    // Bulk Sending Handlers
+    const handleBulkSelect = (orderId) => {
+        setSelectedArchivedOrders(prev =>
+            prev.includes(orderId) ? prev.filter(id => id !== orderId) : [...prev, orderId]
+        );
+    };
+
+    const handleSelectAllCity = (cityOrders) => {
+        const cityOrderIds = cityOrders.map(o => o.id);
+        const allSelected = cityOrderIds.every(id => selectedArchivedOrders.includes(id));
+
+        if (allSelected) {
+            setSelectedArchivedOrders(prev => prev.filter(id => !cityOrderIds.includes(id)));
+        } else {
+            setSelectedArchivedOrders(prev => [...new Set([...prev, ...cityOrderIds])]);
+        }
+    };
+
+    const initiateBulkSend = (city) => {
+        setBulkSendCity(city);
+        setBulkSendTakers([]);
+        setShowBulkSendModal(true);
+    };
+
+    const toggleBulkTaker = (takerId) => {
+        const id = Number(takerId);
+        setBulkSendTakers(prev =>
+            prev.includes(id) ? prev.filter(prevId => prevId !== id) : [...prev, id]
+        );
+    };
+
+    const confirmBulkSend = async () => {
+        if (bulkSendTakers.length === 0) {
+            alert('Please select at least one taker.');
+            return;
+        }
+
+        // Filter selected orders that belong to the current bulk send city
+        const ordersToSend = orders
+            .filter(o => o.status === 'archived' && o.city === bulkSendCity && selectedArchivedOrders.includes(o.id));
+
+        for (const order of ordersToSend) {
+            await updateOrderDetails(order.id, {
+                status: 'pending',
+                assignedTakerIds: bulkSendTakers
+            });
+        }
+
+        setShowBulkSendModal(false);
+        setBulkSendCity(null);
+        setBulkSendTakers([]);
+        setSelectedArchivedOrders(prev => prev.filter(id => !ordersToSend.map(o => o.id).includes(id)));
+        alert(`Sent ${ordersToSend.length} orders to takers!`);
+    };
+
     // Filter Orders
     const filteredOrders = orders.filter(order => {
+        if (showArchived) {
+            return order.status === 'archived';
+        }
+        return order.status !== 'archived';
+    }).filter(order => {
         const searchLower = searchTerm.toLowerCase();
         const matchesTitle = (order.title || '').toLowerCase().includes(searchLower);
         const matchesDesc = (order.description || '').toLowerCase().includes(searchLower);
+        const matchesCity = (order.city || '').toLowerCase().includes(searchLower);
         const matchesDateText = new Date(order.createdAt).toLocaleDateString().includes(searchLower);
         const normalizedCreated = new Date(order.createdAt).toISOString().slice(0, 10);
         const matchesDateFilter = searchDate ? normalizedCreated === searchDate : true;
-        return (matchesTitle || matchesDesc || matchesDateText) && matchesDateFilter;
+        return (matchesTitle || matchesDesc || matchesCity || matchesDateText) && matchesDateFilter;
     });
+
+    // Group Archived Orders by City
+    const archivedOrdersByCity = useMemo(() => {
+        if (!showArchived) return {};
+        const grouped = {};
+        filteredOrders.forEach(order => {
+            const city = order.city || 'Unspecified';
+            if (!grouped[city]) grouped[city] = [];
+            grouped[city].push(order);
+        });
+        return grouped;
+    }, [filteredOrders, showArchived]);
 
     return (
         <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
@@ -118,15 +312,50 @@ const MakerDashboard = () => {
             <div className="glass-panel" style={{ padding: '2rem', marginBottom: '2rem' }}>
                 <h2 style={{ marginBottom: '1.5rem' }}>Create New Order</h2>
                 <form onSubmit={handleSubmit}>
+                    <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem' }}>
+                        <div style={{ flex: 2 }}>
+                            <label style={{ display: 'block', marginBottom: '0.5rem' }}>Customer Name</label>
+                            <input
+                                type="text"
+                                className="input-field"
+                                value={title}
+                                onChange={(e) => {
+                                    setTitle(e.target.value);
+                                    fetchTitleSuggestions(e.target.value);
+                                }}
+                                placeholder="Customer name"
+                                list="title-suggestions"
+                                required
+                            />
+                            <datalist id="title-suggestions">
+                                {titleSuggestions.map((suggestion, i) => (
+                                    <option key={i} value={suggestion} />
+                                ))}
+                            </datalist>
+                        </div>
+                        <div style={{ flex: 1 }}>
+                            <label style={{ display: 'block', marginBottom: '0.5rem' }}>City</label>
+                            <select
+                                className="input-field"
+                                value={city}
+                                onChange={(e) => setCity(e.target.value)}
+                                required
+                            >
+                                {cities.map(c => (
+                                    <option key={c} value={c}>{c}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+
                     <div style={{ marginBottom: '1.5rem' }}>
-                        <label style={{ display: 'block', marginBottom: '0.5rem' }}>Order Title</label>
-                        <input
-                            type="text"
+                        <label style={{ display: 'block', marginBottom: '0.5rem' }}>Note (Optional)</label>
+                        <textarea
                             className="input-field"
-                            value={title}
-                            onChange={(e) => setTitle(e.target.value)}
-                            placeholder="e.g., Monthly Supply Restock"
-                            required
+                            value={note}
+                            onChange={(e) => setNote(e.target.value)}
+                            placeholder="Add a note for the taker..."
+                            rows="2"
                         />
                     </div>
 
@@ -140,10 +369,19 @@ const MakerDashboard = () => {
                                         className="input-field"
                                         placeholder="Product Name"
                                         value={item.name}
-                                        onChange={(e) => handleItemChange(index, 'name', e.target.value)}
+                                        onChange={(e) => {
+                                            handleItemChange(index, 'name', e.target.value);
+                                            fetchProductSuggestions(e.target.value);
+                                        }}
+                                        list="product-suggestions"
                                         required
                                         style={{ flex: 2 }}
                                     />
+                                    <datalist id="product-suggestions">
+                                        {productSuggestions.map((suggestion, i) => (
+                                            <option key={i} value={suggestion} />
+                                        ))}
+                                    </datalist>
                                     <input
                                         type="number"
                                         className="input-field"
@@ -187,9 +425,19 @@ const MakerDashboard = () => {
                         </div>
                     </div>
 
-                    <button type="submit" className="btn-primary" style={{ marginTop: '1rem' }}>
-                        🚀 Send Order
-                    </button>
+                    <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                        <button type="submit" className="btn-primary" style={{ flex: 1 }}>
+                            🚀 Send Order
+                        </button>
+                        <button
+                            type="button"
+                            className="btn-secondary"
+                            style={{ flex: 1, borderColor: 'var(--text-muted)', color: 'var(--text-muted)' }}
+                            onClick={(e) => handleSubmit(e, true)}
+                        >
+                            � Archive Order
+                        </button>
+                    </div>
                 </form>
             </div>
 
@@ -205,50 +453,207 @@ const MakerDashboard = () => {
                     Order created successfully!
                 </div>
             )}
-
             <div style={{ marginTop: '3rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', gap: '1rem', flexWrap: 'wrap' }}>
-                    <h2>Order History</h2>
-                    <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                        <input
-                            type="text"
-                            placeholder="Search orders..."
-                            className="input-field"
-                            style={{ width: '220px' }}
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                        />
+                {/* Orders List */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                    <div style={{ display: 'flex', gap: '1rem' }}>
+                        <button
+                            className={`btn-secondary ${!showArchived ? 'active' : ''}`}
+                            onClick={() => setShowArchived(false)}
+                            style={{ borderColor: !showArchived ? 'var(--primary)' : undefined }}
+                        >
+                            Active Orders
+                        </button>
+                        <button
+                            className={`btn-secondary ${showArchived ? 'active' : ''}`}
+                            onClick={() => setShowArchived(true)}
+                            style={{ borderColor: showArchived ? 'var(--primary)' : undefined }}
+                        >
+                            📂 Archived Orders
+                        </button>
+                    </div>
+                    <div style={{ display: 'flex', gap: '1rem' }}>
                         <input
                             type="date"
                             className="input-field"
                             value={searchDate}
                             onChange={(e) => setSearchDate(e.target.value)}
-                            style={{ width: '180px' }}
+                            style={{ width: '150px' }}
+                        />
+                        <input
+                            type="text"
+                            className="input-field"
+                            placeholder="Search orders..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            style={{ width: '250px' }}
                         />
                     </div>
                 </div>
-                <div style={{ display: 'grid', gap: '1rem' }}>
-                    {filteredOrders.length === 0 ? (
-                        <p style={{ color: 'var(--text-muted)', textAlign: 'center' }}>No orders found.</p>
-                    ) : (
-                        filteredOrders.map(order => (
-                            <div key={order.id} className="glass-panel" style={{ padding: '1.5rem' }}>
-                                <div className="order-header" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+
+                {showArchived ? (
+                    <div style={{ display: 'grid', gap: '2rem' }}>
+                        {Object.entries(archivedOrdersByCity).map(([city, cityOrders]) => {
+                            const selectedInCity = cityOrders.filter(o => selectedArchivedOrders.includes(o.id));
+                            return (
+                                <div key={city} className="glass-panel" style={{ padding: '1.5rem' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                                        <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                            🏙️ {city} <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>({cityOrders.length})</span>
+                                        </h3>
+                                        <div style={{ display: 'flex', gap: '1rem' }}>
+                                            <button
+                                                className="btn-secondary"
+                                                onClick={() => handleSelectAllCity(cityOrders)}
+                                            >
+                                                {selectedInCity.length === cityOrders.length ? 'Deselect All' : 'Select All'}
+                                            </button>
+                                            <button
+                                                className="btn-primary"
+                                                disabled={selectedInCity.length === 0}
+                                                onClick={() => initiateBulkSend(city)}
+                                            >
+                                                Send Selected ({selectedInCity.length})
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div style={{ display: 'grid', gap: '1rem' }}>
+                                        {cityOrders.map(order => (
+                                            <div key={order.id} style={{
+                                                padding: '1rem',
+                                                background: 'rgba(255,255,255,0.03)',
+                                                borderRadius: '8px',
+                                                border: selectedArchivedOrders.includes(order.id) ? '1px solid var(--primary)' : '1px solid transparent'
+                                            }}>
+                                                {editingOrderId === order.id ? (
+                                                    <div style={{ marginBottom: '1rem' }}>
+                                                        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+                                                            <input
+                                                                type="text"
+                                                                className="input-field"
+                                                                value={editTitle}
+                                                                onChange={(e) => setEditTitle(e.target.value)}
+                                                                placeholder="Customer name"
+                                                                style={{ flex: 1 }}
+                                                            />
+                                                            <select
+                                                                className="input-field"
+                                                                value={editCity}
+                                                                onChange={(e) => setEditCity(e.target.value)}
+                                                                style={{ width: '120px' }}
+                                                            >
+                                                                {cities.map(c => (
+                                                                    <option key={c} value={c}>{c}</option>
+                                                                ))}
+                                                            </select>
+                                                        </div>
+
+                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                                            {editItems.map((item, index) => (
+                                                                <div key={index} style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                                                                    <input
+                                                                        type="text"
+                                                                        className="input-field"
+                                                                        placeholder="Product Name"
+                                                                        value={item.name}
+                                                                        onChange={(e) => handleEditItemChange(index, 'name', e.target.value)}
+                                                                        style={{ flex: 2 }}
+                                                                    />
+                                                                    <input
+                                                                        type="number"
+                                                                        className="input-field"
+                                                                        placeholder="Qty"
+                                                                        value={item.quantity}
+                                                                        onChange={(e) => handleEditItemChange(index, 'quantity', parseInt(e.target.value))}
+                                                                        min="1"
+                                                                        style={{ flex: 0.5 }}
+                                                                    />
+                                                                    <button type="button" onClick={() => handleEditRemoveItem(index)} className="btn-secondary" style={{ color: '#ef4444', borderColor: '#ef4444' }}>
+                                                                        ✕
+                                                                    </button>
+                                                                </div>
+                                                            ))}
+                                                            <button type="button" onClick={handleEditAddItem} className="btn-secondary" style={{ alignSelf: 'flex-start', marginTop: '0.5rem' }}>
+                                                                + Add Item
+                                                            </button>
+                                                        </div>
+
+                                                        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
+                                                            <button onClick={() => handleUpdate(order.id)} className="btn-primary" style={{ padding: '0.5rem 1rem' }}>Save Changes</button>
+                                                            <button onClick={() => setEditingOrderId(null)} className="btn-secondary" style={{ padding: '0.5rem 1rem' }}>Cancel</button>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={selectedArchivedOrders.includes(order.id)}
+                                                            onChange={() => handleBulkSelect(order.id)}
+                                                            style={{ width: '1.2rem', height: '1.2rem' }}
+                                                        />
+                                                        <div style={{ flex: 1 }}>
+                                                            <div style={{ fontWeight: 'bold' }}>{order.title || 'Untitled'}</div>
+                                                            <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+                                                                {order.Items?.length || 0} items • Created {new Date(order.createdAt).toLocaleDateString()}
+                                                            </div>
+                                                        </div>
+                                                        <button className="btn-secondary" onClick={() => startEditing(order)}>Edit</button>
+                                                        <button className="btn-danger" onClick={() => handleDeleteClick(order)}>Delete</button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                        {Object.keys(archivedOrdersByCity).length === 0 && (
+                            <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '2rem' }}>No archived orders found.</p>
+                        )}
+                    </div>
+                ) : (
+                    <div style={{ display: 'grid', gap: '1.5rem' }}>
+                        {filteredOrders.length === 0 ? (
+                            <div className="glass-panel" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                                <p>No active orders found matching your criteria.</p>
+                            </div>
+                        ) : (
+                            filteredOrders.map(order => (
+                                <div key={order.id} className="glass-panel" style={{ padding: '1.5rem' }}>
+                                    <div className="order-header" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
                                         <span style={{ fontFamily: 'monospace', background: 'rgba(255,255,255,0.1)', padding: '0.2rem 0.5rem', borderRadius: '4px' }}>
                                             #{String(order.id).padStart(6, '0')}
                                         </span>
                                         {editingOrderId === order.id ? (
-                                            <input
-                                                type="text"
-                                                className="input-field"
-                                                value={editTitle}
-                                                onChange={(e) => setEditTitle(e.target.value)}
-                                                placeholder="Order Title"
-                                                style={{ padding: '0.2rem 0.5rem', fontSize: '1rem' }}
-                                            />
+                                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                <input
+                                                    type="text"
+                                                    className="input-field"
+                                                    value={editTitle}
+                                                    onChange={(e) => setEditTitle(e.target.value)}
+                                                    placeholder="Customer name"
+                                                    style={{ padding: '0.2rem 0.5rem', fontSize: '1rem' }}
+                                                />
+                                                <select
+                                                    className="input-field"
+                                                    value={editCity}
+                                                    onChange={(e) => setEditCity(e.target.value)}
+                                                    style={{ padding: '0.2rem 0.5rem', fontSize: '1rem', width: '120px' }}
+                                                >
+                                                    {cities.map(c => (
+                                                        <option key={c} value={c}>{c}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
                                         ) : (
-                                            <span style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>{order.title || 'Untitled Order'}</span>
+                                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                <span style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>{order.title || 'Untitled Order'}</span>
+                                                {order.city && (
+                                                    <span style={{ fontSize: '0.8rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                                                        🏙️ {order.city}
+                                                    </span>
+                                                )}
+                                            </div>
                                         )}
                                     </div>
                                     <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -280,150 +685,203 @@ const MakerDashboard = () => {
                                             </>
                                         )}
                                     </div>
-                                </div>
 
-                                {editingOrderId === order.id ? (
-                                    <div style={{ marginBottom: '1rem' }}>
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem' }}>
-                                            {editItems.map((item, index) => (
-                                                <div key={index} style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                                                    <input
-                                                        type="text"
-                                                        className="input-field"
-                                                        placeholder="Product Name"
-                                                        value={item.name}
-                                                        onChange={(e) => handleEditItemChange(index, 'name', e.target.value)}
-                                                        style={{ flex: 2 }}
-                                                    />
-                                                    <input
-                                                        type="number"
-                                                        className="input-field"
-                                                        placeholder="Qty"
-                                                        value={item.quantity}
-                                                        onChange={(e) => handleEditItemChange(index, 'quantity', parseInt(e.target.value))}
-                                                        min="1"
-                                                        style={{ flex: 0.5 }}
-                                                    />
-                                                    <button type="button" onClick={() => handleEditRemoveItem(index)} className="btn-secondary" style={{ color: '#ef4444', borderColor: '#ef4444' }}>
-                                                        ✕
-                                                    </button>
-                                                </div>
-                                            ))}
-                                            <button type="button" onClick={handleEditAddItem} className="btn-secondary" style={{ alignSelf: 'flex-start', marginTop: '0.5rem' }}>
-                                                + Add Item
-                                            </button>
-                                        </div>
-
-                                        <div style={{ marginTop: '1.5rem' }}>
-                                            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem' }}>Assigned Takers</label>
-                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                                                {users.filter(u => u.role === 'taker').map(taker => (
-                                                    <button
-                                                        key={taker.id}
-                                                        type="button"
-                                                        onClick={() => toggleEditTaker(taker.id)}
-                                                        className={`btn-secondary ${editSelectedTakers.includes(taker.id) ? 'active' : ''}`}
-                                                        style={{
-                                                            borderColor: editSelectedTakers.includes(taker.id) ? 'var(--primary)' : 'var(--glass-border)',
-                                                            background: editSelectedTakers.includes(taker.id) ? 'rgba(251, 191, 36, 0.1)' : 'transparent',
-                                                            fontSize: '0.8rem',
-                                                            padding: '0.3rem 0.6rem'
-                                                        }}
-                                                    >
-                                                        {taker.name || taker.username}
-                                                    </button>
+                                    {editingOrderId === order.id ? (
+                                        <div style={{ marginBottom: '1rem' }}>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem' }}>
+                                                {editItems.map((item, index) => (
+                                                    <div key={index} style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                                                        <input
+                                                            type="text"
+                                                            className="input-field"
+                                                            placeholder="Product Name"
+                                                            value={item.name}
+                                                            onChange={(e) => {
+                                                                handleEditItemChange(index, 'name', e.target.value);
+                                                                fetchProductSuggestions(e.target.value);
+                                                            }}
+                                                            list="product-suggestions"
+                                                            style={{ flex: 2 }}
+                                                        />
+                                                        <input
+                                                            type="number"
+                                                            className="input-field"
+                                                            placeholder="Qty"
+                                                            value={item.quantity}
+                                                            onChange={(e) => handleEditItemChange(index, 'quantity', parseInt(e.target.value))}
+                                                            min="1"
+                                                            style={{ flex: 0.5 }}
+                                                        />
+                                                        <button type="button" onClick={() => handleEditRemoveItem(index)} className="btn-secondary" style={{ color: '#ef4444', borderColor: '#ef4444' }}>
+                                                            ✕
+                                                        </button>
+                                                    </div>
                                                 ))}
+                                                <button type="button" onClick={handleEditAddItem} className="btn-secondary" style={{ alignSelf: 'flex-start', marginTop: '0.5rem' }}>
+                                                    + Add Item
+                                                </button>
                                             </div>
-                                        </div>
 
-                                        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
-                                            <button onClick={() => handleUpdate(order.id)} className="btn-primary" style={{ padding: '0.5rem 1rem' }}>Save Changes</button>
-                                            <button onClick={() => setEditingOrderId(null)} className="btn-secondary" style={{ padding: '0.5rem 1rem' }}>Cancel</button>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <>
-                                        {order.description && !order.description.startsWith('Order with') && (
-                                            <p style={{ fontSize: '1rem', marginBottom: '1rem', fontStyle: 'italic', color: 'var(--text-muted)' }}>{order.description}</p>
-                                        )}
-
-                                        {order.Items && order.Items.length > 0 && (
-                                            <table className="order-items-table" style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '1rem' }}>
-                                                <thead>
-                                                    <tr style={{ borderBottom: '1px solid var(--glass-border)', textAlign: 'left' }}>
-                                                        <th style={{ padding: '0.5rem', color: 'var(--text-muted)' }}>Product</th>
-                                                        <th style={{ padding: '0.5rem', color: 'var(--text-muted)', textAlign: 'right' }}>Qty</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {order.Items.map(item => (
-                                                        <tr key={item.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                                                            <td className="item-name" style={{ padding: '0.5rem' }}>{item.name}</td>
-                                                            <td className="item-qty" style={{ padding: '0.5rem', textAlign: 'right' }}>{item.quantity}</td>
-                                                        </tr>
+                                            <div style={{ marginTop: '1.5rem' }}>
+                                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem' }}>Assigned Takers</label>
+                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                                                    {users.filter(u => u.role === 'taker').map(taker => (
+                                                        <button
+                                                            key={taker.id}
+                                                            type="button"
+                                                            onClick={() => toggleEditTaker(taker.id)}
+                                                            className={`btn-secondary ${editSelectedTakers.includes(taker.id) ? 'active' : ''}`}
+                                                            style={{
+                                                                borderColor: editSelectedTakers.includes(taker.id) ? 'var(--primary)' : 'var(--glass-border)',
+                                                                background: editSelectedTakers.includes(taker.id) ? 'rgba(251, 191, 36, 0.1)' : 'transparent',
+                                                                fontSize: '0.8rem',
+                                                                padding: '0.3rem 0.6rem'
+                                                            }}
+                                                        >
+                                                            {taker.name || taker.username}
+                                                        </button>
                                                     ))}
-                                                </tbody>
-                                            </table>
-                                        )}
-                                    </>
-                                )}
-
-                                <div style={{ borderTop: '1px solid var(--glass-border)', paddingTop: '1rem', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-                                    Assigned to: <span style={{ color: 'var(--text-main)' }}>
-                                        {order.AssignedTakers?.map(t => t.username).join(', ') || 'None'}
-                                    </span>
-                                </div>
-
-                                {order.History && order.History.length > 0 && (
-                                    <div style={{ marginTop: '1rem' }}>
-                                        <button
-                                            onClick={() => setExpandedHistoryId(expandedHistoryId === order.id ? null : order.id)}
-                                            style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', padding: 0, fontSize: '0.9rem' }}
-                                        >
-                                            {expandedHistoryId === order.id ? 'Hide History' : `View Edit History(${order.History.length})`}
-                                        </button>
-
-                                        {expandedHistoryId === order.id && (
-                                            <div style={{ marginTop: '0.5rem', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', padding: '1rem' }}>
-                                                {order.History.map(log => {
-                                                    let logColor = 'var(--text-main)';
-                                                    let icon = '📝';
-
-                                                    if (log.newDescription.startsWith('Added:')) {
-                                                        logColor = '#34d399'; // Green
-                                                        icon = '➕';
-                                                    } else if (log.newDescription.startsWith('Removed:')) {
-                                                        logColor = '#ef4444'; // Red
-                                                        icon = '❌';
-                                                    } else if (log.newDescription.startsWith('Updated')) {
-                                                        logColor = '#fbbf24'; // Yellow
-                                                        icon = '🔄';
-                                                    } else if (log.newDescription.startsWith('Title:')) {
-                                                        logColor = '#60a5fa'; // Blue
-                                                        icon = '🏷️';
-                                                    }
-
-                                                    return (
-                                                        <div key={log.id} style={{ marginBottom: '0.8rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.5rem' }}>
-                                                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.2rem' }}>
-                                                                <span>{new Date(log.createdAt).toLocaleString()}</span>
-                                                                <span style={{ fontStyle: 'italic' }}>by {log.Editor ? log.Editor.username : 'Unknown'}</span>
-                                                            </div>
-                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: logColor, fontSize: '0.9rem' }}>
-                                                                <span>{icon}</span>
-                                                                <span>{log.newDescription}</span>
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })}
+                                                </div>
                                             </div>
-                                        )}
+
+                                            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
+                                                <button onClick={() => handleUpdate(order.id)} className="btn-primary" style={{ padding: '0.5rem 1rem' }}>Save Changes</button>
+                                                <button onClick={() => setEditingOrderId(null)} className="btn-secondary" style={{ padding: '0.5rem 1rem' }}>Cancel</button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            {order.description && !order.description.startsWith('Order with') && (
+                                                <p style={{ fontSize: '1rem', marginBottom: '1rem', fontStyle: 'italic', color: 'var(--text-muted)' }}>{order.description}</p>
+                                            )}
+
+                                            {order.Items && order.Items.length > 0 && (
+                                                <table className="order-items-table" style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '1rem' }}>
+                                                    <thead>
+                                                        <tr style={{ borderBottom: '1px solid var(--glass-border)', textAlign: 'left' }}>
+                                                            <th style={{ padding: '0.5rem', color: 'var(--text-muted)' }}>Product</th>
+                                                            <th style={{ padding: '0.5rem', color: 'var(--text-muted)', textAlign: 'right' }}>Qty</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {order.Items.map(item => (
+                                                            <tr key={item.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                                                <td className="item-name" style={{ padding: '0.5rem' }}>{item.name}</td>
+                                                                <td className="item-qty" style={{ padding: '0.5rem', textAlign: 'right' }}>{item.quantity}</td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            )}
+                                        </>
+                                    )}
+
+                                    <div style={{ borderTop: '1px solid var(--glass-border)', paddingTop: '1rem', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+                                        Assigned to: <span style={{ color: 'var(--text-main)' }}>
+                                            {order.AssignedTakers?.map(t => t.username).join(', ') || 'None'}
+                                        </span>
                                     </div>
-                                )}
+
+                                    {order.History && order.History.length > 0 && (
+                                        <div style={{ marginTop: '1rem' }}>
+                                            <button
+                                                onClick={() => setExpandedHistoryId(expandedHistoryId === order.id ? null : order.id)}
+                                                style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', padding: 0, fontSize: '0.9rem' }}
+                                            >
+                                                {expandedHistoryId === order.id ? 'Hide History' : `View Edit History(${order.History.length})`}
+                                            </button>
+
+                                            {expandedHistoryId === order.id && (
+                                                <div style={{ marginTop: '0.5rem', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', padding: '1rem' }}>
+                                                    {[...order.History].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).map(log => {
+                                                        let logColor = 'var(--text-main)';
+                                                        let icon = '📝';
+
+                                                        if (log.newDescription.startsWith('Added:')) {
+                                                            logColor = '#34d399'; // Green
+                                                            icon = '➕';
+                                                        } else if (log.newDescription.startsWith('Removed:')) {
+                                                            logColor = '#ef4444'; // Red
+                                                            icon = '❌';
+                                                        } else if (log.newDescription.startsWith('Updated')) {
+                                                            logColor = '#fbbf24'; // Yellow
+                                                            icon = '🔄';
+                                                        } else if (log.newDescription.startsWith('Title:')) {
+                                                            logColor = '#60a5fa'; // Blue
+                                                            icon = '🏷️';
+                                                        } else if (log.newDescription.startsWith('City:')) {
+                                                            logColor = '#a78bfa'; // Purple
+                                                            icon = '🏙️';
+                                                        }
+
+                                                        return (
+                                                            <div key={log.id} style={{ marginBottom: '0.8rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.5rem' }}>
+                                                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.2rem' }}>
+                                                                    <span>{new Date(log.createdAt).toLocaleString()}</span>
+                                                                    <span style={{ fontStyle: 'italic' }}>by {log.Editor ? log.Editor.username : 'Unknown'}</span>
+                                                                </div>
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: logColor, fontSize: '0.9rem' }}>
+                                                                    <span>{icon}</span>
+                                                                    <span>{log.newDescription}</span>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            ))
+                        )}
+                    </div>
+                )}
+
+                {/* Bulk Send Modal */}
+                {showBulkSendModal && (
+                    <div style={{
+                        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                        background: 'rgba(0,0,0,0.8)', display: 'flex', justifyContent: 'center', alignItems: 'center',
+                        zIndex: 1000
+                    }}>
+                        <div className="glass-panel" style={{ padding: '2rem', width: '90%', maxWidth: '500px' }}>
+                            <h2 style={{ marginBottom: '1rem' }}>Send Orders to Takers</h2>
+                            <p style={{ marginBottom: '1.5rem', color: 'var(--text-muted)' }}>
+                                Assigning {selectedArchivedOrders.filter(id => orders.find(o => o.id === id)?.city === bulkSendCity).length} orders in {bulkSendCity}.
+                            </p>
+
+                            <div style={{ marginBottom: '1.5rem' }}>
+                                <label style={{ display: 'block', marginBottom: '0.5rem' }}>Select Takers</label>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                                    {users.filter(u => u.role === 'taker').map(taker => (
+                                        <button
+                                            key={taker.id}
+                                            type="button"
+                                            className={`btn-secondary ${bulkSendTakers.includes(taker.id) ? 'active' : ''}`}
+                                            onClick={() => toggleBulkTaker(taker.id)}
+                                            style={{ borderColor: bulkSendTakers.includes(taker.id) ? 'var(--primary)' : undefined }}
+                                        >
+                                            {taker.username}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
-                        ))
-                    )}
-                </div>
+
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+                                <button className="btn-secondary" onClick={() => setShowBulkSendModal(false)}>Cancel</button>
+                                <button className="btn-primary" onClick={confirmBulkSend}>Confirm & Send</button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+                {/* Delete Confirmation Modal */}
+                <ConfirmModal
+                    isOpen={showDeleteModal}
+                    onClose={() => setShowDeleteModal(false)}
+                    onConfirm={confirmDelete}
+                    title="Delete Order"
+                    message="Are you sure you want to delete this order? This action cannot be undone."
+                />
             </div>
         </div>
     );

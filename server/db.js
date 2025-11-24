@@ -1,11 +1,22 @@
 const { Sequelize } = require('sequelize');
 const path = require('path');
 
-const sequelize = new Sequelize({
-    dialect: 'sqlite',
-    storage: path.join(__dirname, '../database.sqlite'), // Adjusted path since this file is in server/config or similar, wait, I'll put it in server/db.js
-    logging: false
-});
+const sequelize = new Sequelize(
+    process.env.DB_NAME,
+    process.env.DB_USER,
+    process.env.DB_PASSWORD,
+    {
+        host: process.env.DB_HOST,
+        dialect: 'postgres',
+        logging: false,
+        pool: {
+            max: 20,
+            min: 0,
+            acquire: 30000,
+            idle: 10000
+        }
+    }
+);
 
 const User = require('./models/User')(sequelize);
 const Order = require('./models/Order')(sequelize);
@@ -13,6 +24,7 @@ const OrderItem = require('./models/OrderItem')(sequelize);
 const OrderLog = require('./models/OrderLog')(sequelize);
 const Notification = require('./models/Notification')(sequelize);
 const PushSubscription = require('./models/PushSubscription')(sequelize);
+const OrderAssignments = require('./models/OrderAssignments')(sequelize);
 const ActivityLog = require('./models/ActivityLog')(sequelize);
 
 // Associations
@@ -21,8 +33,8 @@ User.hasMany(Order, { as: 'CreatedOrders', foreignKey: 'makerId' });
 Order.belongsTo(User, { as: 'Maker', foreignKey: 'makerId' });
 
 // User <-> Order (Taker Assignment - Many-to-Many)
-User.belongsToMany(Order, { through: 'OrderAssignments', as: 'AssignedOrders', foreignKey: 'userId' });
-Order.belongsToMany(User, { through: 'OrderAssignments', as: 'AssignedTakers', foreignKey: 'orderId' });
+User.belongsToMany(Order, { through: OrderAssignments, as: 'AssignedOrders', foreignKey: 'userId' });
+Order.belongsToMany(User, { through: OrderAssignments, as: 'AssignedTakers', foreignKey: 'orderId' });
 
 // Order <-> OrderItem
 Order.hasMany(OrderItem, { as: 'Items', foreignKey: 'orderId' });
@@ -52,4 +64,4 @@ ActivityLog.belongsTo(User, { as: 'User', foreignKey: 'userId' });
 User.belongsTo(User, { as: 'Approver', foreignKey: 'approvedBy' });
 User.hasMany(User, { as: 'ApprovedUsers', foreignKey: 'approvedBy' });
 
-module.exports = { sequelize, User, Order, OrderItem, OrderLog, Notification, PushSubscription, ActivityLog };
+module.exports = { sequelize, User, Order, OrderItem, OrderLog, Notification, PushSubscription, ActivityLog, OrderAssignments };

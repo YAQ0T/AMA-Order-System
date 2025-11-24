@@ -21,6 +21,13 @@ module.exports = (sequelize) => {
             defaultValue: false,
             allowNull: false
         },
+        email: {
+            type: DataTypes.STRING,
+            allowNull: true,
+            validate: {
+                isEmail: true
+            }
+        },
         approvedBy: {
             type: DataTypes.INTEGER,
             allowNull: true,
@@ -33,6 +40,12 @@ module.exports = (sequelize) => {
             type: DataTypes.DATE,
             allowNull: true
         }
+    }, {
+        indexes: [
+            {
+                fields: ['role']
+            }
+        ]
     });
 
     User.beforeCreate(async (user) => {

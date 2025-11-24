@@ -26,7 +26,7 @@ router.get('/users', async (req, res) => {
 
         const users = await User.findAll({
             where,
-            attributes: ['id', 'username', 'role', 'isApproved', 'approvedBy', 'approvedAt', 'createdAt'],
+            attributes: ['id', 'username', 'email', 'role', 'isApproved', 'approvedBy', 'approvedAt', 'createdAt'],
             include: [{
                 model: User,
                 as: 'Approver',
@@ -99,6 +99,43 @@ router.put('/users/:id/approve', async (req, res) => {
     }
 });
 
+// Update user email
+router.put('/users/:id/email', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { email } = req.body;
+
+        const user = await User.findByPk(id);
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        // Validate email format if provided
+        if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            return res.status(400).json({ error: 'Invalid email format' });
+        }
+
+        user.email = email || null;
+        await user.save();
+
+        await logActivity(req.user.id, 'user_email_updated', 'user', user.id, {
+            username: user.username,
+            newEmail: email
+        }, req.ip);
+
+        res.json({
+            message: 'Email updated successfully',
+            user: {
+                id: user.id,
+                username: user.username,
+                email: user.email
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Delete a user
 router.delete('/users/:id', async (req, res) => {
     try {
@@ -120,6 +157,45 @@ router.delete('/users/:id', async (req, res) => {
             role: user.role
         };
 
+        // 1. Remove from OrderAssignments (Taker)
+        const assignedOrders = await user.getAssignedOrders();
+        if (assignedOrders.length > 0) {
+            await user.setAssignedOrders([]);
+        }
+
+        // 2. Delete PushSubscriptions
+        const { PushSubscription, Notification } = require('../db');
+        await PushSubscription.destroy({ where: { userId: id } });
+
+        // 3. Delete Notifications
+        await Notification.destroy({ where: { userId: id } });
+
+        // 4. Delete ActivityLogs
+        await ActivityLog.destroy({ where: { userId: id } });
+
+        // 5. Update OrderLogs (set changedBy to null)
+        // If schema doesn't allow null, we might need to delete them, but try update first
+        try {
+            await OrderLog.update({ changedBy: null }, { where: { changedBy: id } });
+        } catch (err) {
+            console.warn('Could not set OrderLog.changedBy to null, deleting logs instead:', err.message);
+            await OrderLog.destroy({ where: { changedBy: id } });
+        }
+
+        // 6. Update Approved Users (set approvedBy to null)
+        await User.update({ approvedBy: null }, { where: { approvedBy: id } });
+
+        // 7. Delete Created Orders (Maker)
+        // We need to delete items and logs for these orders first
+        const createdOrders = await Order.findAll({ where: { makerId: id } });
+        for (const order of createdOrders) {
+            await OrderItem.destroy({ where: { orderId: order.id } });
+            await OrderLog.destroy({ where: { orderId: order.id } });
+            await order.setAssignedTakers([]); // Clear assignments
+            await order.destroy();
+        }
+
+        // 8. Finally delete the user
         await user.destroy();
 
         // Log the deletion
@@ -127,6 +203,7 @@ router.delete('/users/:id', async (req, res) => {
 
         res.json({ message: 'User deleted successfully' });
     } catch (error) {
+        console.error('Delete user error:', error);
         res.status(500).json({ error: error.message });
     }
 });

@@ -18,6 +18,18 @@ module.exports = (sequelize) => {
             type: DataTypes.INTEGER,
             allowNull: true
         }
+    }, {
+        indexes: [
+            {
+                fields: ['userId']
+            },
+            {
+                fields: ['isRead']
+            },
+            {
+                fields: ['createdAt']
+            }
+        ]
     });
 
     return Notification;

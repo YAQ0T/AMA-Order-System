@@ -10,12 +10,15 @@ import TakerDashboard from './pages/TakerDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import PendingApproval from './pages/PendingApproval';
 
-const ProtectedRoute = ({ children, allowedRole }) => {
+const ProtectedRoute = ({ children, allowedRoles }) => {
   const { user, loading } = useAuth();
 
   if (loading) return <div className="container">Loading...</div>;
   if (!user) return <Navigate to="/login" />;
-  if (allowedRole && user.role !== allowedRole) return <Navigate to="/" />;
+
+  // Support both single role (string) and multiple roles (array)
+  const roles = Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles];
+  if (allowedRoles && !roles.includes(user.role)) return <Navigate to="/" />;
 
   return children;
 };
@@ -49,19 +52,19 @@ function App() {
               <Route index element={<HomeRedirect />} />
 
               <Route path="admin" element={
-                <ProtectedRoute allowedRole="admin">
+                <ProtectedRoute allowedRoles="admin">
                   <AdminDashboard />
                 </ProtectedRoute>
               } />
 
               <Route path="maker" element={
-                <ProtectedRoute allowedRole="maker">
+                <ProtectedRoute allowedRoles={['maker', 'admin']}>
                   <MakerDashboard />
                 </ProtectedRoute>
               } />
 
               <Route path="taker" element={
-                <ProtectedRoute allowedRole="taker">
+                <ProtectedRoute allowedRoles="taker">
                   <TakerDashboard />
                 </ProtectedRoute>
               } />

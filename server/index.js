@@ -1,10 +1,10 @@
-
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
-const { sequelize } = require('./db');
+const { sequelize, OrderAssignments, Order, User } = require('./db');
 const { seedAdmin } = require('./utils/seedAdmin');
 
 const app = express();
@@ -15,11 +15,23 @@ app.use(cors());
 app.use(express.json());
 
 // Sync Database and seed admin
-// Note: using `alter: true` with SQLite can fail when foreign key constraints
-// are present, because it attempts to recreate tables that other tables
-// reference. Rely on the existing schema instead of automatic alters to avoid
-// those constraint errors during startup.
 sequelize.sync().then(async () => {
+    // Alter Order table to allow null description
+    try {
+        await Order.sync({ alter: true });
+        console.log('Order table altered');
+    } catch (err) {
+        console.error('Error altering Order table:', err);
+    }
+
+    // Alter User table to add email column
+    try {
+        await User.sync({ alter: true });
+        console.log('User table altered - email column added');
+    } catch (err) {
+        console.error('Error altering User table:', err);
+    }
+
     console.log('Database synced');
     await seedAdmin();
 }).catch((error) => {
@@ -36,6 +48,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/items', require('./routes/items'));
 
 // Export for routes to use
 module.exports = { app, sequelize };
@@ -49,7 +62,7 @@ if (require.main === module) {
 
     https.createServer(httpsOptions, app).listen(PORT, '0.0.0.0', () => {
         console.log(`HTTPS Server running on https://localhost:${PORT}`);
-        console.log(`Also accessible at https://10.10.10.56:${PORT}`);
+        console.log(`Also accessible at https://10.10.10.110:${PORT}`);
     });
 }
 

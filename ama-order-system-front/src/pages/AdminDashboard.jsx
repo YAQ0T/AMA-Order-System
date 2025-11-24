@@ -17,6 +17,8 @@ const AdminDashboard = () => {
     const [newOrderDescription, setNewOrderDescription] = useState('');
     const [newOrderItems, setNewOrderItems] = useState([{ name: '', quantity: 1 }]);
     const [newOrderTakers, setNewOrderTakers] = useState([]);
+    const [newOrderCity, setNewOrderCity] = useState('نابلس');
+    const cities = ['نابلس', 'الخليل', 'جنين', 'طولكرم', 'بديا', 'قلقيليا', 'رامالله', 'بيت لحم', 'الداخل'];
     const [editingOrderId, setEditingOrderId] = useState(null);
     const [editTitle, setEditTitle] = useState('');
     const [editDescription, setEditDescription] = useState('');
@@ -27,6 +29,90 @@ const AdminDashboard = () => {
     const [logVisibility, setLogVisibility] = useState({});
     const [orderSearchTerm, setOrderSearchTerm] = useState('');
     const [orderDateFilter, setOrderDateFilter] = useState('');
+
+    // Archiving & Bulk Send State
+    const [showArchived, setShowArchived] = useState(false);
+    const [selectedArchivedOrders, setSelectedArchivedOrders] = useState([]);
+    const [bulkSendCity, setBulkSendCity] = useState(null);
+    const [showBulkSendModal, setShowBulkSendModal] = useState(false);
+    const [bulkSendTakers, setBulkSendTakers] = useState([]);
+
+    // Product Suggestions
+    const [productSuggestions, setProductSuggestions] = useState([]);
+    const [titleSuggestions, setTitleSuggestions] = useState([]);
+
+    // Email editing
+    const [editingEmailUserId, setEditingEmailUserId] = useState(null);
+    const [editingEmail, setEditingEmail] = useState('');
+
+    const fetchProductSuggestions = async (query) => {
+        if (!query || query.length < 2) {
+            setProductSuggestions([]);
+            return;
+        }
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/items/suggestions?q=${encodeURIComponent(query)}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                setProductSuggestions(data);
+            }
+        } catch (error) {
+            console.error('Failed to fetch suggestions', error);
+        }
+    };
+
+    const fetchTitleSuggestions = async (query) => {
+        if (!query || query.length < 1) {
+            setTitleSuggestions([]);
+            return;
+        }
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/orders/suggestions?q=${encodeURIComponent(query)}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                setTitleSuggestions(data);
+            }
+        } catch (error) {
+            console.error('Failed to fetch title suggestions', error);
+        }
+    };
+
+    // Start editing email
+    const startEditingEmail = (user) => {
+        setEditingEmailUserId(user.id);
+        setEditingEmail(user.email || '');
+    };
+
+    // Save email
+    const saveEmail = async (userId) => {
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/admin/users/${userId}/email`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ email: editingEmail })
+            });
+
+            if (res.ok) {
+                alert('Email updated successfully!');
+                setEditingEmailUserId(null);
+                setEditingEmail('');
+                fetchUsers();
+            } else {
+                const data = await res.json();
+                alert(data.error || 'Failed to update email');
+            }
+        } catch (err) {
+            console.error('Failed to update email', err);
+            alert('Failed to update email');
+        }
+    };
 
     // Fetch stats
     const fetchStats = async () => {
@@ -150,12 +236,14 @@ const AdminDashboard = () => {
     };
 
     // Create order as admin
-    const createOrder = async () => {
+    const createOrder = async (isArchived = false) => {
         const payload = {
             title: newOrderTitle,
             description: newOrderDescription,
             items: newOrderItems,
-            assignedTakerIds: newOrderTakers
+            assignedTakerIds: newOrderTakers,
+            city: newOrderCity,
+            status: isArchived ? 'archived' : 'pending'
         };
 
         try {
@@ -173,6 +261,7 @@ const AdminDashboard = () => {
                 setNewOrderDescription('');
                 setNewOrderItems([{ name: '', quantity: 1 }]);
                 setNewOrderTakers([]);
+                setNewOrderCity('نابلس');
                 fetchOrders();
                 alert('Order created successfully');
             } else {
@@ -265,6 +354,107 @@ const AdminDashboard = () => {
         setEditItems(prev => prev.map((item, i) => i === index ? { ...item, [field]: value } : item));
     };
 
+    // Bulk Sending Handlers
+    const handleBulkSelect = (orderId) => {
+        setSelectedArchivedOrders(prev =>
+            prev.includes(orderId) ? prev.filter(id => id !== orderId) : [...prev, orderId]
+        );
+    };
+
+    const handleSelectAllCity = (cityOrders) => {
+        const cityOrderIds = cityOrders.map(o => o.id);
+        const allSelected = cityOrderIds.every(id => selectedArchivedOrders.includes(id));
+
+        if (allSelected) {
+            setSelectedArchivedOrders(prev => prev.filter(id => !cityOrderIds.includes(id)));
+        } else {
+            setSelectedArchivedOrders(prev => [...new Set([...prev, ...cityOrderIds])]);
+        }
+    };
+
+    const initiateBulkSend = (city) => {
+        setBulkSendCity(city);
+        setBulkSendTakers([]);
+        setShowBulkSendModal(true);
+    };
+
+    const toggleBulkTaker = (takerId) => {
+        const id = Number(takerId);
+        setBulkSendTakers(prev =>
+            prev.includes(id) ? prev.filter(prevId => prevId !== id) : [...prev, id]
+        );
+    };
+
+    const confirmBulkSend = async () => {
+        if (bulkSendTakers.length === 0) {
+            alert('Please select at least one taker.');
+            return;
+        }
+
+        // Filter selected orders that belong to the current bulk send city
+        const ordersToSend = orders
+            .filter(o => o.status === 'archived' && o.city === bulkSendCity && selectedArchivedOrders.includes(o.id));
+
+        const updatedOrders = [];
+
+        for (const order of ordersToSend) {
+            // Update each order
+            try {
+                const payload = {
+                    title: order.title,
+                    description: order.description,
+                    status: 'pending',
+                    items: order.Items,
+                    assignedTakerIds: bulkSendTakers,
+                    city: order.city,
+                    skipEmail: true // Skip individual emails during bulk send
+                };
+
+                const response = await fetch(`${API_BASE_URL}/api/orders/${order.id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (response.ok) {
+                    const updated = await response.json();
+                    updatedOrders.push(updated);
+                }
+            } catch (err) {
+                console.error(`Failed to update order ${order.id}`, err);
+            }
+        }
+
+        // Send one consolidated email per taker
+        if (updatedOrders.length > 0 && bulkSendTakers.length > 0) {
+            try {
+                await fetch(`${API_BASE_URL}/api/orders/bulk-email`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        orderIds: updatedOrders.map(o => o.id),
+                        takerIds: bulkSendTakers
+                    })
+                });
+            } catch (err) {
+                console.error('Failed to send bulk emails', err);
+            }
+        }
+
+        setShowBulkSendModal(false);
+        setBulkSendCity(null);
+        setBulkSendTakers([]);
+        setSelectedArchivedOrders(prev => prev.filter(id => !ordersToSend.map(o => o.id).includes(id)));
+        fetchOrders();
+        alert(`Sent ${ordersToSend.length} orders to takers!`);
+    };
+
     const toggleOrderLogs = async (orderId) => {
         setLogVisibility(prev => ({ ...prev, [orderId]: !prev[orderId] }));
 
@@ -277,7 +467,8 @@ const AdminDashboard = () => {
             });
             if (res.ok) {
                 const data = await res.json();
-                setOrderLogs(prev => ({ ...prev, [orderId]: { logs: data, loading: false } }));
+                const sortedLogs = data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+                setOrderLogs(prev => ({ ...prev, [orderId]: { logs: sortedLogs, loading: false } }));
             } else {
                 setOrderLogs(prev => ({ ...prev, [orderId]: { logs: [], loading: false, error: 'Failed to load logs' } }));
             }
@@ -365,6 +556,9 @@ const AdminDashboard = () => {
     };
 
     const filteredOrders = orders.filter(order => {
+        // Exclude archived orders from active view
+        if (order.status === 'archived') return false;
+
         const searchLower = orderSearchTerm.toLowerCase();
         const normalizedDate = new Date(order.createdAt).toISOString().slice(0, 10);
         const matchesDate = orderDateFilter ? normalizedDate === orderDateFilter : true;
@@ -553,6 +747,7 @@ const AdminDashboard = () => {
                                 <thead>
                                     <tr style={{ borderBottom: '1px solid var(--glass-border)' }}>
                                         <th style={{ padding: '0.75rem', textAlign: 'left' }}>Username</th>
+                                        <th style={{ padding: '0.75rem', textAlign: 'left' }}>Email</th>
                                         <th style={{ padding: '0.75rem', textAlign: 'left' }}>Role</th>
                                         <th style={{ padding: '0.75rem', textAlign: 'left' }}>Status</th>
                                         <th style={{ padding: '0.75rem', textAlign: 'left' }}>Joined</th>
@@ -563,6 +758,71 @@ const AdminDashboard = () => {
                                     {users.map(user => (
                                         <tr key={user.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                                             <td style={{ padding: '0.75rem' }}>{user.username}</td>
+                                            <td style={{ padding: '0.75rem', fontSize: '0.9rem' }}>
+                                                {editingEmailUserId === user.id ? (
+                                                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                                                        <input
+                                                            type="email"
+                                                            className="input-field"
+                                                            value={editingEmail}
+                                                            onChange={(e) => setEditingEmail(e.target.value)}
+                                                            placeholder="user@example.com"
+                                                            style={{ padding: '0.35rem 0.5rem', fontSize: '0.85rem', minWidth: '200px' }}
+                                                        />
+                                                        <button
+                                                            onClick={() => saveEmail(user.id)}
+                                                            style={{
+                                                                background: '#22c55e',
+                                                                color: 'white',
+                                                                border: 'none',
+                                                                padding: '0.35rem 0.75rem',
+                                                                borderRadius: '6px',
+                                                                cursor: 'pointer',
+                                                                fontSize: '0.85rem'
+                                                            }}
+                                                        >
+                                                            ✓
+                                                        </button>
+                                                        <button
+                                                            onClick={() => {
+                                                                setEditingEmailUserId(null);
+                                                                setEditingEmail('');
+                                                            }}
+                                                            style={{
+                                                                background: '#6b7280',
+                                                                color: 'white',
+                                                                border: 'none',
+                                                                padding: '0.35rem 0.75rem',
+                                                                borderRadius: '6px',
+                                                                cursor: 'pointer',
+                                                                fontSize: '0.85rem'
+                                                            }}
+                                                        >
+                                                            ✕
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                                                        <span style={{ color: user.email ? 'var(--text)' : 'var(--text-muted)' }}>
+                                                            {user.email || 'Not set'}
+                                                        </span>
+                                                        <button
+                                                            onClick={() => startEditingEmail(user)}
+                                                            style={{
+                                                                background: 'transparent',
+                                                                color: 'var(--primary)',
+                                                                border: '1px solid var(--primary)',
+                                                                padding: '0.25rem 0.5rem',
+                                                                borderRadius: '4px',
+                                                                cursor: 'pointer',
+                                                                fontSize: '0.75rem'
+                                                            }}
+                                                        >
+                                                            ✏️ Edit
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </td>
                                             <td style={{ padding: '0.75rem' }}>
                                                 <span style={{
                                                     padding: '0.25rem 0.75rem',
@@ -636,21 +896,42 @@ const AdminDashboard = () => {
                         <h3>Create Order</h3>
                         <div style={{ display: 'grid', gap: '1rem', marginTop: '0.75rem' }}>
                             <div>
-                                <label style={{ display: 'block', marginBottom: '0.35rem' }}>Title</label>
+                                <label style={{ display: 'block', marginBottom: '0.35rem' }}>Customer Name</label>
                                 <input
                                     className="input-field"
                                     value={newOrderTitle}
-                                    onChange={(e) => setNewOrderTitle(e.target.value)}
-                                    placeholder="Order title"
+                                    onChange={(e) => {
+                                        setNewOrderTitle(e.target.value);
+                                        fetchTitleSuggestions(e.target.value);
+                                    }}
+                                    placeholder="Customer name"
+                                    list="title-suggestions"
                                 />
+                                <datalist id="title-suggestions">
+                                    {titleSuggestions.map((suggestion, i) => (
+                                        <option key={i} value={suggestion} />
+                                    ))}
+                                </datalist>
                             </div>
                             <div>
-                                <label style={{ display: 'block', marginBottom: '0.35rem' }}>Description</label>
+                                <label style={{ display: 'block', marginBottom: '0.35rem' }}>City</label>
+                                <select
+                                    className="input-field"
+                                    value={newOrderCity}
+                                    onChange={(e) => setNewOrderCity(e.target.value)}
+                                >
+                                    {cities.map(city => (
+                                        <option key={city} value={city}>{city}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '0.35rem' }}>Note</label>
                                 <textarea
                                     className="input-field"
                                     value={newOrderDescription}
                                     onChange={(e) => setNewOrderDescription(e.target.value)}
-                                    placeholder="Optional description"
+                                    placeholder="Optional note"
                                     rows={3}
                                 />
                             </div>
@@ -666,9 +947,18 @@ const AdminDashboard = () => {
                                                 className="input-field"
                                                 placeholder="Name"
                                                 value={item.name}
-                                                onChange={(e) => updateNewItem(idx, 'name', e.target.value)}
+                                                onChange={(e) => {
+                                                    updateNewItem(idx, 'name', e.target.value);
+                                                    fetchProductSuggestions(e.target.value);
+                                                }}
+                                                list="product-suggestions"
                                                 style={{ flex: 2 }}
                                             />
+                                            <datalist id="product-suggestions">
+                                                {productSuggestions.map((suggestion, i) => (
+                                                    <option key={i} value={suggestion} />
+                                                ))}
+                                            </datalist>
                                             <input
                                                 type="number"
                                                 className="input-field"
@@ -683,10 +973,10 @@ const AdminDashboard = () => {
                                                     ✕
                                                 </button>
                                             )}
-                                        </div>
+                                        </div >
                                     ))}
-                                </div>
-                            </div>
+                                </div >
+                            </div >
                             <div>
                                 <label style={{ display: 'block', marginBottom: '0.35rem' }}>Assign Takers</label>
                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
@@ -706,240 +996,410 @@ const AdminDashboard = () => {
                                     )}
                                 </div>
                             </div>
-                            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                                <button className="btn-primary" onClick={createOrder} disabled={!newOrderTitle.trim()}>
+                            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+                                <button
+                                    className="btn-secondary"
+                                    onClick={() => createOrder(true)}
+                                    disabled={!newOrderTitle.trim()}
+                                    style={{ borderColor: 'var(--text-muted)', color: 'var(--text-muted)' }}
+                                >
+                                    📂 Archive Order
+                                </button>
+                                <button className="btn-primary" onClick={() => createOrder(false)} disabled={!newOrderTitle.trim()}>
                                     Create Order
                                 </button>
                             </div>
-                        </div>
-                    </div>
+                        </div >
+                    </div >
+
                     {loading ? (
                         <p>Loading...</p>
                     ) : (
                         <div style={{ display: 'grid', gap: '1rem' }}>
-                            {filteredOrders.map(order => {
-                                const isExpanded = expandedOrderId === order.id;
-                                return (
-                                    <div key={order.id} className="glass-panel" style={{ padding: '1rem' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', gap: '1rem', alignItems: 'center' }}>
-                                            <div>
-                                                <span style={{ fontWeight: 'bold' }}>Order #{order.id}</span>
-                                                {' - '}
-                                                <span style={{ color: 'var(--text-muted)' }}>
-                                                    by {order.Maker?.username}
-                                                </span>
-                                            </div>
-                                            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                                                <span style={{
-                                                    padding: '0.25rem 0.75rem',
-                                                    borderRadius: '12px',
-                                                    fontSize: '0.85rem',
-                                                    background: getStatusColor(order.status),
-                                                    color: 'white'
-                                                }}>
-                                                    {order.status}
-                                                </span>
-                                                <button
-                                                    className="btn-secondary"
-                                                    onClick={() => setExpandedOrderId(isExpanded ? null : order.id)}
-                                                >
-                                                    {isExpanded ? 'Hide Details' : 'View Details'}
-                                                </button>
-                                            </div>
-                                        </div>
-                                        <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-                                            {order.Items?.length || 0} items • Created {new Date(order.createdAt).toLocaleDateString()}
-                                        </div>
-                                        {order.AssignedTakers && order.AssignedTakers.length > 0 && (
-                                            <div style={{ marginTop: '0.5rem', fontSize: '0.9rem' }}>
-                                                Assigned to: {order.AssignedTakers.map(t => t.username).join(', ')}
-                                            </div>
-                                        )}
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
+                                <div style={{ display: 'flex', background: 'rgba(255,255,255,0.1)', borderRadius: '8px', padding: '0.25rem' }}>
+                                    <button
+                                        onClick={() => setShowArchived(false)}
+                                        style={{
+                                            background: !showArchived ? 'var(--primary)' : 'transparent',
+                                            color: !showArchived ? 'white' : 'var(--text-muted)',
+                                            border: 'none',
+                                            padding: '0.5rem 1rem',
+                                            borderRadius: '6px',
+                                            cursor: 'pointer',
+                                            fontWeight: !showArchived ? 'bold' : 'normal'
+                                        }}
+                                    >
+                                        Active Orders
+                                    </button>
+                                    <button
+                                        onClick={() => setShowArchived(true)}
+                                        style={{
+                                            background: showArchived ? 'var(--primary)' : 'transparent',
+                                            color: showArchived ? 'white' : 'var(--text-muted)',
+                                            border: 'none',
+                                            padding: '0.5rem 1rem',
+                                            borderRadius: '6px',
+                                            cursor: 'pointer',
+                                            fontWeight: showArchived ? 'bold' : 'normal'
+                                        }}
+                                    >
+                                        📂 Archived Orders
+                                    </button>
+                                </div>
+                            </div>
 
-                                        {isExpanded && (
-                                            <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--glass-border)' }}>
-                                                {editingOrderId === order.id ? (
-                                                    <div style={{ display: 'grid', gap: '0.75rem' }}>
-                                                        <div>
-                                                            <label style={{ display: 'block', marginBottom: '0.35rem' }}>Title</label>
-                                                            <input className="input-field" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
-                                                        </div>
-                                                        <div>
-                                                            <label style={{ display: 'block', marginBottom: '0.35rem' }}>Description</label>
-                                                            <textarea className="input-field" rows={3} value={editDescription} onChange={(e) => setEditDescription(e.target.value)} />
-                                                        </div>
-                                                        <div>
-                                                            <label style={{ display: 'block', marginBottom: '0.35rem' }}>Status</label>
-                                                            <select className="input-field" value={editStatus} onChange={(e) => setEditStatus(e.target.value)}>
-                                                                <option value="pending">pending</option>
-                                                                <option value="in-progress">in-progress</option>
-                                                                <option value="completed">completed</option>
-                                                            </select>
-                                                        </div>
-                                                        <div>
-                                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
-                                                                <label>Items</label>
-                                                                <button type="button" className="btn-secondary" onClick={addEditItem}>+ Add Item</button>
+                            {showArchived ? (
+                                <div style={{ display: 'grid', gap: '2rem' }}>
+                                    {Object.entries(
+                                        orders
+                                            .filter(o => o.status === 'archived')
+                                            .reduce((acc, order) => {
+                                                const city = order.city || 'Unspecified';
+                                                if (!acc[city]) acc[city] = [];
+                                                acc[city].push(order);
+                                                return acc;
+                                            }, {})
+                                    ).map(([city, cityOrders]) => {
+                                        const selectedInCity = cityOrders.filter(o => selectedArchivedOrders.includes(o.id));
+                                        return (
+                                            <div key={city} className="glass-panel" style={{ padding: '1.5rem' }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                                                    <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                        🏙️ {city} <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>({cityOrders.length})</span>
+                                                    </h3>
+                                                    <div style={{ display: 'flex', gap: '1rem' }}>
+                                                        <button
+                                                            className="btn-secondary"
+                                                            onClick={() => handleSelectAllCity(cityOrders)}
+                                                        >
+                                                            {selectedInCity.length === cityOrders.length ? 'Deselect All' : 'Select All'}
+                                                        </button>
+                                                        <button
+                                                            className="btn-primary"
+                                                            disabled={selectedInCity.length === 0}
+                                                            onClick={() => initiateBulkSend(city)}
+                                                        >
+                                                            Send Selected ({selectedInCity.length})
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <div style={{ display: 'grid', gap: '1rem' }}>
+                                                    {cityOrders.map(order => (
+                                                        <div key={order.id} style={{
+                                                            display: 'flex',
+                                                            gap: '1rem',
+                                                            alignItems: 'center',
+                                                            padding: '1rem',
+                                                            background: 'rgba(255,255,255,0.03)',
+                                                            borderRadius: '8px',
+                                                            border: selectedArchivedOrders.includes(order.id) ? '1px solid var(--primary)' : '1px solid transparent'
+                                                        }}>
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={selectedArchivedOrders.includes(order.id)}
+                                                                onChange={() => handleBulkSelect(order.id)}
+                                                                style={{ width: '1.2rem', height: '1.2rem' }}
+                                                            />
+                                                            <div style={{ flex: 1 }}>
+                                                                <div style={{ fontWeight: 'bold' }}>{order.title || 'Untitled'}</div>
+                                                                <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+                                                                    {order.Items?.length || 0} items • Created {new Date(order.createdAt).toLocaleDateString()}
+                                                                </div>
                                                             </div>
-                                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                                                {editItems.map((item, idx) => (
-                                                                    <div key={`edit-${idx}`} style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-                                                                        <input
-                                                                            className="input-field"
-                                                                            placeholder="Name"
-                                                                            value={item.name}
-                                                                            onChange={(e) => updateEditItem(idx, 'name', e.target.value)}
-                                                                            style={{ flex: 2 }}
-                                                                        />
-                                                                        <input
-                                                                            type="number"
-                                                                            className="input-field"
-                                                                            placeholder="Qty"
-                                                                            value={item.quantity}
-                                                                            onChange={(e) => updateEditItem(idx, 'quantity', parseInt(e.target.value) || 1)}
-                                                                            style={{ flex: 1 }}
-                                                                            min={1}
-                                                                        />
-                                                                        {editItems.length > 1 && (
-                                                                            <button type="button" className="btn-secondary" onClick={() => removeEditItem(idx)}>
-                                                                                ✕
+                                                            <button className="btn-danger" onClick={() => deleteOrder(order.id)}>Delete</button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            ) : (
+                                filteredOrders.map(order => {
+                                    const isExpanded = expandedOrderId === order.id;
+                                    return (
+                                        <div key={order.id} className="glass-panel" style={{ padding: '1rem' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', gap: '1rem', alignItems: 'center' }}>
+                                                <div>
+                                                    <span style={{ fontWeight: 'bold' }}>Order #{order.id}</span>
+                                                    {' - '}
+                                                    <span style={{ color: 'var(--text-muted)' }}>
+                                                        by {order.Maker?.username}
+                                                    </span>
+                                                </div>
+                                                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                                                    <span style={{
+                                                        padding: '0.25rem 0.75rem',
+                                                        borderRadius: '12px',
+                                                        fontSize: '0.85rem',
+                                                        background: getStatusColor(order.status),
+                                                        color: 'white'
+                                                    }}>
+                                                        {order.status}
+                                                    </span>
+                                                    <button
+                                                        className="btn-secondary"
+                                                        onClick={() => setExpandedOrderId(isExpanded ? null : order.id)}
+                                                    >
+                                                        {isExpanded ? 'Hide Details' : 'View Details'}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+                                                {order.Items?.length || 0} items • Created {new Date(order.createdAt).toLocaleDateString()}
+                                            </div>
+                                            {
+                                                order.AssignedTakers && order.AssignedTakers.length > 0 && (
+                                                    <div style={{ marginTop: '0.5rem', fontSize: '0.9rem' }}>
+                                                        Assigned to: {order.AssignedTakers.map(t => t.username).join(', ')}
+                                                    </div>
+                                                )
+                                            }
+
+                                            {
+                                                isExpanded && (
+                                                    <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--glass-border)' }}>
+                                                        {editingOrderId === order.id ? (
+                                                            <div style={{ display: 'grid', gap: '0.75rem' }}>
+                                                                <div>
+                                                                    <label style={{ display: 'block', marginBottom: '0.35rem' }}>Title</label>
+                                                                    <input className="input-field" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
+                                                                </div>
+                                                                <div>
+                                                                    <label style={{ display: 'block', marginBottom: '0.35rem' }}>Description</label>
+                                                                    <textarea className="input-field" rows={3} value={editDescription} onChange={(e) => setEditDescription(e.target.value)} />
+                                                                </div>
+                                                                <div>
+                                                                    <label style={{ display: 'block', marginBottom: '0.35rem' }}>Status</label>
+                                                                    <select className="input-field" value={editStatus} onChange={(e) => setEditStatus(e.target.value)}>
+                                                                        <option value="pending">pending</option>
+                                                                        <option value="in-progress">in-progress</option>
+                                                                        <option value="completed">completed</option>
+                                                                    </select>
+                                                                </div>
+                                                                <div>
+                                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                                                                        <label>Items</label>
+                                                                        <button type="button" className="btn-secondary" onClick={addEditItem}>+ Add Item</button>
+                                                                    </div>
+                                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                                                        {editItems.map((item, idx) => (
+                                                                            <div key={`edit-${idx}`} style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                                                                                <input
+                                                                                    className="input-field"
+                                                                                    placeholder="Name"
+                                                                                    value={item.name}
+                                                                                    onChange={(e) => updateEditItem(idx, 'name', e.target.value)}
+                                                                                    style={{ flex: 2 }}
+                                                                                />
+                                                                                <input
+                                                                                    type="number"
+                                                                                    className="input-field"
+                                                                                    placeholder="Qty"
+                                                                                    value={item.quantity}
+                                                                                    onChange={(e) => updateEditItem(idx, 'quantity', parseInt(e.target.value) || 1)}
+                                                                                    style={{ flex: 1 }}
+                                                                                    min={1}
+                                                                                />
+                                                                                {editItems.length > 1 && (
+                                                                                    <button type="button" className="btn-secondary" onClick={() => removeEditItem(idx)}>
+                                                                                        ✕
+                                                                                    </button>
+                                                                                )}
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+                                                                <div>
+                                                                    <label style={{ display: 'block', marginBottom: '0.35rem' }}>Assign Takers</label>
+                                                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                                                                        {takers.map(taker => (
+                                                                            <button
+                                                                                key={taker.id}
+                                                                                type="button"
+                                                                                className={`btn-secondary ${editTakers.includes(taker.id) ? 'active' : ''}`}
+                                                                                onClick={() => toggleEditTaker(taker.id)}
+                                                                                style={{ borderColor: editTakers.includes(taker.id) ? 'var(--primary)' : undefined }}
+                                                                            >
+                                                                                {taker.username} (ID: {taker.id})
                                                                             </button>
+                                                                        ))}
+                                                                        {takers.length === 0 && (
+                                                                            <span style={{ color: 'var(--text-muted)' }}>No takers available</span>
                                                                         )}
                                                                     </div>
-                                                                ))}
+                                                                </div>
+                                                                <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                                                                    <button className="btn-secondary" onClick={() => setEditingOrderId(null)}>Cancel</button>
+                                                                    <button className="btn-primary" onClick={() => saveEdit(order.id)}>Save Changes</button>
+                                                                </div>
                                                             </div>
-                                                        </div>
-                                                        <div>
-                                                            <label style={{ display: 'block', marginBottom: '0.35rem' }}>Assign Takers</label>
-                                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                                                                {takers.map(taker => (
-                                                                    <button
-                                                                        key={taker.id}
-                                                                        type="button"
-                                                                        className={`btn-secondary ${editTakers.includes(taker.id) ? 'active' : ''}`}
-                                                                        onClick={() => toggleEditTaker(taker.id)}
-                                                                        style={{ borderColor: editTakers.includes(taker.id) ? 'var(--primary)' : undefined }}
-                                                                    >
-                                                                        {taker.username} (ID: {taker.id})
+                                                        ) : (
+                                                            <div style={{ display: 'grid', gap: '0.75rem' }}>
+                                                                <div style={{ marginBottom: '0.5rem', color: 'var(--text-muted)' }}>
+                                                                    {order.description || 'No description provided.'}
+                                                                </div>
+                                                                <div>
+                                                                    <strong>Items:</strong>
+                                                                    <ul style={{ margin: '0.5rem 0 0 1rem', padding: 0 }}>
+                                                                        {(order.Items || []).map(item => (
+                                                                            <li key={`${order.id}-${item.name}`} style={{ color: 'var(--text-muted)' }}>
+                                                                                {item.name} - Qty: {item.quantity}
+                                                                            </li>
+                                                                        ))}
+                                                                        {(order.Items || []).length === 0 && (
+                                                                            <li style={{ color: 'var(--text-muted)' }}>No items listed</li>
+                                                                        )}
+                                                                    </ul>
+                                                                </div>
+                                                                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+                                                                    <span>Created: {new Date(order.createdAt).toLocaleString()}</span>
+                                                                    <span>Updated: {new Date(order.updatedAt).toLocaleString()}</span>
+                                                                </div>
+                                                                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                                                                    <button className="btn-secondary" onClick={() => startEditing(order)}>Edit Order</button>
+                                                                    <button className="btn-danger" onClick={() => deleteOrder(order.id)}>
+                                                                        Delete Order
                                                                     </button>
-                                                                ))}
-                                                                {takers.length === 0 && (
-                                                                    <span style={{ color: 'var(--text-muted)' }}>No takers available</span>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                                                            <button className="btn-secondary" onClick={() => setEditingOrderId(null)}>Cancel</button>
-                                                            <button className="btn-primary" onClick={() => saveEdit(order.id)}>Save Changes</button>
-                                                        </div>
-                                                    </div>
-                                                ) : (
-                                                    <div style={{ display: 'grid', gap: '0.75rem' }}>
-                                                        <div style={{ marginBottom: '0.5rem', color: 'var(--text-muted)' }}>
-                                                            {order.description || 'No description provided.'}
-                                                        </div>
-                                                        <div>
-                                                            <strong>Items:</strong>
-                                                            <ul style={{ margin: '0.5rem 0 0 1rem', padding: 0 }}>
-                                                                {(order.Items || []).map(item => (
-                                                                    <li key={`${order.id}-${item.name}`} style={{ color: 'var(--text-muted)' }}>
-                                                                        {item.name} - Qty: {item.quantity}
-                                                                    </li>
-                                                                ))}
-                                                                {(order.Items || []).length === 0 && (
-                                                                    <li style={{ color: 'var(--text-muted)' }}>No items listed</li>
-                                                                )}
-                                                            </ul>
-                                                        </div>
-                                                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-                                                            <span>Created: {new Date(order.createdAt).toLocaleString()}</span>
-                                                            <span>Updated: {new Date(order.updatedAt).toLocaleString()}</span>
-                                                        </div>
-                                                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                                                            <button className="btn-secondary" onClick={() => startEditing(order)}>Edit Order</button>
-                                                            <button className="btn-danger" onClick={() => deleteOrder(order.id)}>
-                                                                Delete Order
-                                                            </button>
-                                                            <button className="btn-secondary" onClick={() => toggleOrderLogs(order.id)}>
-                                                                {logVisibility[order.id] ? 'Hide Logs' : 'View Logs'}
-                                                            </button>
-                                                        </div>
-                                                        {logVisibility[order.id] && (
-                                                            <div className="glass-panel" style={{ padding: '0.75rem' }}>
-                                                                <h4 style={{ marginTop: 0 }}>Change History</h4>
-                                                                {orderLogs[order.id]?.loading && <p>Loading logs...</p>}
-                                                                {orderLogs[order.id]?.error && <p style={{ color: 'var(--accent)' }}>{orderLogs[order.id].error}</p>}
-                                                                {(orderLogs[order.id]?.logs || []).length === 0 && !orderLogs[order.id]?.loading && (
-                                                                    <p style={{ color: 'var(--text-muted)' }}>No logs recorded.</p>
-                                                                )}
-                                                                {(orderLogs[order.id]?.logs || []).map(log => (
-                                                                    <div key={log.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.35rem 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                                                                        <div>
-                                                                            <div style={{ fontWeight: '500' }}>{log.newDescription}</div>
-                                                                            <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                                                                                {log.Editor?.username || 'Unknown'}
+                                                                    <button className="btn-secondary" onClick={() => toggleOrderLogs(order.id)}>
+                                                                        {logVisibility[order.id] ? 'Hide Logs' : 'View Logs'}
+                                                                    </button>
+                                                                </div>
+                                                                {logVisibility[order.id] && (
+                                                                    <div className="glass-panel" style={{ padding: '0.75rem' }}>
+                                                                        <h4 style={{ marginTop: 0 }}>Change History</h4>
+                                                                        {orderLogs[order.id]?.loading && <p>Loading logs...</p>}
+                                                                        {orderLogs[order.id]?.error && <p style={{ color: 'var(--accent)' }}>{orderLogs[order.id].error}</p>}
+                                                                        {(orderLogs[order.id]?.logs || []).length === 0 && !orderLogs[order.id]?.loading && (
+                                                                            <p style={{ color: 'var(--text-muted)' }}>No logs recorded.</p>
+                                                                        )}
+                                                                        {(orderLogs[order.id]?.logs || []).map(log => (
+                                                                            <div key={log.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.35rem 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                                                                <div>
+                                                                                    <div style={{ fontWeight: '500' }}>{log.newDescription}</div>
+                                                                                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                                                                                        {log.Editor?.username || 'Unknown'}
+                                                                                    </div>
+                                                                                </div>
+                                                                                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                                                                                    {new Date(log.createdAt).toLocaleString()}
+                                                                                </div>
                                                                             </div>
-                                                                        </div>
-                                                                        <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                                                                            {new Date(log.createdAt).toLocaleString()}
-                                                                        </div>
+                                                                        ))}
                                                                     </div>
-                                                                ))}
+                                                                )}
                                                             </div>
                                                         )}
                                                     </div>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                );
-                            })}
+                                                )
+                                            }
+                                        </div >
+                                    );
+                                })
+                            )}
                         </div>
                     )}
                 </div>
             )}
 
             {/* Logs Tab */}
-            {activeTab === 'logs' && (
-                <div className="glass-panel" style={{ padding: '1.5rem' }}>
-                    <h2 style={{ marginBottom: '1rem' }}>Activity Logs</h2>
-                    {loading ? (
-                        <p>Loading...</p>
-                    ) : (
-                        <div style={{ overflowX: 'auto' }}>
-                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
-                                <thead>
-                                    <tr style={{ borderBottom: '1px solid var(--glass-border)' }}>
-                                        <th style={{ padding: '0.75rem', textAlign: 'left' }}>Time</th>
-                                        <th style={{ padding: '0.75rem', textAlign: 'left' }}>User</th>
-                                        <th style={{ padding: '0.75rem', textAlign: 'left' }}>Action</th>
-                                        <th style={{ padding: '0.75rem', textAlign: 'left' }}>Details</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {logs.map(log => (
-                                        <tr key={log.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                                            <td style={{ padding: '0.75rem', color: 'var(--text-muted)' }}>
-                                                {new Date(log.createdAt).toLocaleString()}
-                                            </td>
-                                            <td style={{ padding: '0.75rem' }}>
-                                                {log.User?.username || 'System'}
-                                            </td>
-                                            <td style={{ padding: '0.75rem' }}>
-                                                {log.action.replace(/_/g, ' ')}
-                                            </td>
-                                            <td style={{ padding: '0.75rem', color: 'var(--text-muted)' }}>
-                                                {log.details ? JSON.stringify(log.details).substring(0, 50) : '-'}
-                                            </td>
+            {
+                activeTab === 'logs' && (
+                    <div className="glass-panel" style={{ padding: '1.5rem' }}>
+                        <h2 style={{ marginBottom: '1rem' }}>Activity Logs</h2>
+                        {loading ? (
+                            <p>Loading...</p>
+                        ) : (
+                            <div style={{ overflowX: 'auto' }}>
+                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+                                    <thead>
+                                        <tr style={{ borderBottom: '1px solid var(--glass-border)' }}>
+                                            <th style={{ padding: '0.75rem', textAlign: 'left' }}>Time</th>
+                                            <th style={{ padding: '0.75rem', textAlign: 'left' }}>User</th>
+                                            <th style={{ padding: '0.75rem', textAlign: 'left' }}>Action</th>
+                                            <th style={{ padding: '0.75rem', textAlign: 'left' }}>Details</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody>
+                                        {logs.map(log => (
+                                            <tr key={log.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                                <td style={{ padding: '0.75rem', color: 'var(--text-muted)' }}>
+                                                    {new Date(log.createdAt).toLocaleString()}
+                                                </td>
+                                                <td style={{ padding: '0.75rem' }}>
+                                                    {log.User?.username || 'System'}
+                                                </td>
+                                                <td style={{ padding: '0.75rem' }}>
+                                                    {log.action.replace(/_/g, ' ')}
+                                                </td>
+                                                <td style={{ padding: '0.75rem', color: 'var(--text-muted)' }}>
+                                                    {log.details ? JSON.stringify(log.details).substring(0, 50) : '-'}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+                )
+            }
+            {/* Bulk Send Modal */}
+            {showBulkSendModal && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'rgba(0,0,0,0.8)',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    zIndex: 1000
+                }}>
+                    <div className="glass-panel" style={{ width: '500px', padding: '2rem', maxHeight: '80vh', overflowY: 'auto' }}>
+                        <h2>Bulk Send Orders - {bulkSendCity}</h2>
+                        <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
+                            Select takers to assign to the selected orders.
+                        </p>
+
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '2rem' }}>
+                            {takers.map(taker => (
+                                <button
+                                    key={taker.id}
+                                    onClick={() => toggleBulkTaker(taker.id)}
+                                    className={`btn-secondary ${bulkSendTakers.includes(taker.id) ? 'active' : ''}`}
+                                    style={{
+                                        borderColor: bulkSendTakers.includes(taker.id) ? 'var(--primary)' : 'var(--glass-border)',
+                                        background: bulkSendTakers.includes(taker.id) ? 'rgba(251, 191, 36, 0.1)' : 'transparent'
+                                    }}
+                                >
+                                    {taker.username}
+                                </button>
+                            ))}
                         </div>
-                    )}
+
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+                            <button
+                                className="btn-secondary"
+                                onClick={() => setShowBulkSendModal(false)}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                className="btn-primary"
+                                onClick={confirmBulkSend}
+                                disabled={bulkSendTakers.length === 0}
+                            >
+                                Confirm & Send
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
-        </div>
+        </div >
     );
 };
 

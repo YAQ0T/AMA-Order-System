@@ -141,7 +141,7 @@ export const OrderProvider = ({ children }) => {
   };
 
   return (
-    <OrderContext.Provider value={{ orders, users, createOrder, getOrdersForUser, updateOrderStatus, updateOrderDetails, deleteOrder }}>
+    <OrderContext.Provider value={{ orders, users, createOrder, getOrdersForUser, updateOrderStatus, updateOrderDetails, deleteOrder, fetchOrders }}>
       {children}
     </OrderContext.Provider>
   );

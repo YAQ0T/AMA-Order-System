@@ -68,6 +68,11 @@ const Login = () => {
                 <p style={{ marginTop: '1.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
                     Don't have an account? <Link to="/signup" style={{ color: 'var(--primary)' }}>Sign Up</Link>
                 </p>
+                <p style={{ marginTop: '1rem', textAlign: 'center', fontSize: '0.9rem' }}>
+                    <a href="/install-cert.html" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-muted)', textDecoration: 'underline' }}>
+                        📱 Install iOS Certificate
+                    </a>
+                </p>
             </div>
         </div>
     );

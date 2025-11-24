@@ -3,8 +3,11 @@ import { Outlet, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../utils/api';
 
+import { useOrder } from '../context/OrderContext';
+
 const Layout = () => {
     const { user, logout, token } = useAuth();
+    const { fetchOrders } = useOrder();
     const [notifications, setNotifications] = useState([]);
     const [showNotifications, setShowNotifications] = useState(false);
     const unreadCount = notifications.filter(n => !n.isRead).length;
@@ -96,8 +99,13 @@ const Layout = () => {
 
     useEffect(() => {
         if (token) {
-            fetchNotifications();
-            const interval = setInterval(fetchNotifications, 30000);
+            const refreshData = () => {
+                fetchNotifications();
+                fetchOrders();
+            };
+
+            refreshData();
+            const interval = setInterval(refreshData, 5000); // Poll every 5 seconds
 
             // Subscribe if permission was previously granted without prompting the user
             if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
@@ -106,7 +114,7 @@ const Layout = () => {
 
             return () => clearInterval(interval);
         }
-    }, [token]);
+    }, [token, fetchOrders]);
 
     // Close notifications dropdown when clicking outside
     useEffect(() => {
@@ -255,8 +263,18 @@ const Layout = () => {
                                     <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'capitalize' }}>{user.role}</div>
                                 </div>
                                 {user.role === 'admin' && (
-                                    <Link to="/admin" className="btn-primary" style={{ padding: '0.5rem 1rem', textDecoration: 'none' }}>
-                                        👑 Dashboard
+                                    <>
+                                        <Link to="/admin" className="btn-primary" style={{ padding: '0.5rem 1rem', textDecoration: 'none' }}>
+                                            👑 Admin Dashboard
+                                        </Link>
+                                        <Link to="/maker" className="btn-secondary" style={{ padding: '0.5rem 1rem', textDecoration: 'none' }}>
+                                            📦 Maker Dashboard
+                                        </Link>
+                                    </>
+                                )}
+                                {user.role === 'maker' && (
+                                    <Link to="/maker" className="btn-primary" style={{ padding: '0.5rem 1rem', textDecoration: 'none' }}>
+                                        📦 Dashboard
                                     </Link>
                                 )}
                                 <button onClick={logout} className="btn-secondary" style={{ padding: '0.5rem 1rem' }}>Logout</button>

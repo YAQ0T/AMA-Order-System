@@ -1,7 +1,9 @@
 const express = require('express');
-const { Order, User, OrderItem, OrderLog, Notification } = require('../db');
+const { Order, User, OrderItem, OrderLog, Notification, sequelize } = require('../db');
 const { authenticateToken } = require('../middleware/auth');
 const { sendPushNotification } = require('../utils/push');
+const { sendOrderCreatedEmail, sendOrderUpdatedEmail, sendOrderUpdatedByTakerEmail, sendBulkOrdersEmail } = require('../utils/email');
+const { Op } = require('sequelize');
 
 const router = express.Router();
 
@@ -12,21 +14,26 @@ router.post('/', authenticateToken, async (req, res) => {
             return res.status(403).json({ error: 'Only makers or admins can create orders' });
         }
 
-        const { title, description, assignedTakerIds, items } = req.body;
+        const { title, description, assignedTakerIds, items, city, status } = req.body;
+        console.log('Creating order:', { title, assignedTakerIds, makerId: req.user.id, city, status });
 
         let defaultDesc = 'New Order';
         if (items && items.length > 0) {
             defaultDesc = 'Order with ' + items.length + ' items';
         }
 
+        const orderStatus = status === 'archived' ? 'archived' : 'pending';
+
         const order = await Order.create({
             title,
             description: description || defaultDesc,
             makerId: req.user.id,
-            status: 'pending'
+            status: orderStatus,
+            city
         });
 
-        if (assignedTakerIds && assignedTakerIds.length > 0) {
+        // Only assign takers and notify if NOT archived
+        if (orderStatus !== 'archived' && assignedTakerIds && assignedTakerIds.length > 0) {
             await order.setAssignedTakers(assignedTakerIds);
 
             // Notify Takers
@@ -56,14 +63,22 @@ router.post('/', authenticateToken, async (req, res) => {
             await OrderItem.bulkCreate(orderItems);
         }
 
-        // Fetch complete order with items
+        // Fetch complete order with associations for response
         const completeOrder = await Order.findByPk(order.id, {
             include: [
-                { model: User, as: 'Maker', attributes: ['id', 'username', 'role'] },
-                { model: User, as: 'AssignedTakers', attributes: ['id', 'username'] },
+                { model: User, as: 'Maker', attributes: ['id', 'username'] },
+                { model: User, as: 'AssignedTakers', attributes: ['id', 'username', 'email'] },
                 { model: OrderItem, as: 'Items' }
             ]
         });
+
+        // Send email notifications to assigned takers
+        if (completeOrder.AssignedTakers && completeOrder.AssignedTakers.length > 0) {
+            const maker = await User.findByPk(req.user.id, { attributes: ['id', 'username', 'email'] });
+            sendOrderCreatedEmail(completeOrder, completeOrder.AssignedTakers, maker).catch(err => {
+                console.error('Error sending order created emails:', err);
+            });
+        }
 
         res.status(201).json(completeOrder);
     } catch (error) {
@@ -116,7 +131,8 @@ router.get('/', authenticateToken, async (req, res) => {
                         },
                         { model: User, as: 'AssignedTakers', attributes: ['id', 'username'] }
                     ]
-                }]
+                }],
+                order: [[{ model: Order, as: 'AssignedOrders' }, 'createdAt', 'ASC']]
             });
             orders = user ? user.AssignedOrders : [];
         }
@@ -134,7 +150,11 @@ router.put('/:id', authenticateToken, async (req, res) => {
         console.log(`PUT /api/orders/${req.params.id} hit by user: ${req.user.username} (${req.user.role})`);
         console.log('Request body:', req.body);
 
-        const { status, title, description, items, assignedTakerIds } = req.body;
+        const { status, title, description, items, assignedTakerIds, skipEmail } = req.body;
+
+        if (skipEmail) {
+            console.log('⏭️ Skipping individual email (bulk send mode)');
+        }
 
         const order = await Order.findByPk(req.params.id, {
             include: [
@@ -156,8 +176,8 @@ router.put('/:id', authenticateToken, async (req, res) => {
             return res.status(403).json({ error: 'Not authorized to edit this order' });
         }
 
-        // Handle Details Update (Title, Description, Items)
-        if (title !== undefined || description !== undefined || items !== undefined || assignedTakerIds !== undefined) {
+        // Handle Details Update (Title, Description, Items, City)
+        if (title !== undefined || description !== undefined || items !== undefined || assignedTakerIds !== undefined || req.body.city !== undefined) {
             // Log Title Change
             if (title && title !== order.title) {
                 await OrderLog.create({
@@ -167,6 +187,17 @@ router.put('/:id', authenticateToken, async (req, res) => {
                     changedBy: req.user.id
                 });
                 order.title = title;
+            }
+
+            // Log City Change
+            if (req.body.city !== undefined && req.body.city !== order.city) {
+                await OrderLog.create({
+                    orderId: order.id,
+                    previousDescription: order.city || 'None',
+                    newDescription: `City: ${order.city || 'None'} -> ${req.body.city}`,
+                    changedBy: req.user.id
+                });
+                order.city = req.body.city;
             }
 
             // Log Description Change
@@ -268,7 +299,32 @@ router.put('/:id', authenticateToken, async (req, res) => {
 
         // Handle Status Update
         if (status) {
+            const oldStatus = order.status;
             order.status = status;
+
+            // If changing from 'archived' to 'pending' (Sending the order), notify takers
+            if (oldStatus === 'archived' && status === 'pending') {
+                const currentTakers = await order.getAssignedTakers();
+                if (currentTakers.length > 0) {
+                    await Notification.bulkCreate(
+                        currentTakers.map(t => ({
+                            userId: t.id,
+                            message: `New Order Assigned: ${order.title || 'Untitled Order'}`,
+                            type: 'alert',
+                            orderId: order.id
+                        }))
+                    );
+
+                    // Send Push Notifications
+                    currentTakers.forEach(t => {
+                        sendPushNotification(t.id, {
+                            title: 'New Order Assigned',
+                            body: `You have been assigned to order #${order.id}: ${order.title || 'Untitled Order'}`,
+                            url: `/`
+                        });
+                    });
+                }
+            }
 
             // If Taker updates status, notify Maker
             if (req.user.role === 'taker') {
@@ -287,7 +343,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
         // If Maker edits, notify ALL current takers
         if (
             req.user.role === 'maker' &&
-            (req.body.title || req.body.description || req.body.items || req.body.assignedTakerIds)
+            (req.body.title || req.body.description || req.body.items || req.body.assignedTakerIds || req.body.city)
         ) {
             const currentTakers = await order.getAssignedTakers();
             if (currentTakers.length > 0) {
@@ -305,7 +361,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
         // If Taker edits details, notify Maker
         if (
             req.user.role === 'taker' &&
-            (req.body.title || req.body.description || req.body.items || req.body.assignedTakerIds)
+            (req.body.title || req.body.description || req.body.items || req.body.assignedTakerIds || req.body.city)
         ) {
             await Notification.create({
                 userId: order.makerId,
@@ -315,19 +371,43 @@ router.put('/:id', authenticateToken, async (req, res) => {
             });
         }
 
-        // Reload to get full data
+        // Reload to get full data including recent logs
         const updatedOrder = await Order.findByPk(order.id, {
             include: [
-                { model: User, as: 'Maker', attributes: ['id', 'username', 'role'] },
-                { model: User, as: 'AssignedTakers', attributes: ['id', 'username'] },
+                { model: User, as: 'Maker', attributes: ['id', 'username', 'role', 'email'] },
+                { model: User, as: 'AssignedTakers', attributes: ['id', 'username', 'email'] },
                 {
                     model: OrderLog,
                     as: 'History',
-                    include: [{ model: User, as: 'Editor', attributes: ['username'] }]
+                    include: [{ model: User, as: 'Editor', attributes: ['username'] }],
+                    limit: 5,
+                    order: [['createdAt', 'DESC']]
                 },
                 { model: OrderItem, as: 'Items' }
             ]
         });
+
+        // Send email notifications (skip if this is part of bulk send)
+        if (!skipEmail) {
+            const editor = await User.findByPk(req.user.id, { attributes: ['id', 'username', 'email'] });
+
+            // Get recent changes for email
+            const recentChanges = updatedOrder.History?.slice(0, 5) || [];
+
+            // If Maker updated, notify Takers
+            if (req.user.role === 'maker' && updatedOrder.AssignedTakers && updatedOrder.AssignedTakers.length > 0) {
+                sendOrderUpdatedEmail(updatedOrder, updatedOrder.AssignedTakers, editor, recentChanges).catch(err => {
+                    console.error('Error sending order updated emails to takers:', err);
+                });
+            }
+
+            // If Taker updated, notify Maker
+            if (req.user.role === 'taker' && updatedOrder.Maker) {
+                sendOrderUpdatedByTakerEmail(updatedOrder, updatedOrder.Maker, editor, recentChanges).catch(err => {
+                    console.error('Error sending order updated email to maker:', err);
+                });
+            }
+        }
 
         res.json(updatedOrder);
     } catch (error) {
@@ -336,7 +416,35 @@ router.put('/:id', authenticateToken, async (req, res) => {
     }
 });
 
-// Delete Order
+// GET /api/orders/suggestions - Get order title suggestions
+router.get('/suggestions', authenticateToken, async (req, res) => {
+    try {
+        const { q } = req.query;
+
+        if (!q) {
+            return res.json([]);
+        }
+
+        const suggestions = await Order.findAll({
+            attributes: [[sequelize.fn('DISTINCT', sequelize.col('title')), 'title']],
+            where: {
+                makerId: req.user.id,
+                title: {
+                    [Op.iLike]: `%${q}%`
+                }
+            },
+            limit: 6,
+            raw: true
+        });
+
+        res.json(suggestions.map(s => s.title));
+    } catch (error) {
+        console.error('Error fetching title suggestions:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// DELETE /api/orders/:id - Delete an order
 router.delete('/:id', authenticateToken, async (req, res) => {
     try {
         if (req.user.role !== 'maker') {
@@ -363,6 +471,57 @@ router.delete('/:id', authenticateToken, async (req, res) => {
         res.json({ message: 'Order deleted successfully' });
     } catch (error) {
         console.error('Error deleting order:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// POST /api/orders/bulk-email - Send bulk email notifications
+router.post('/bulk-email', authenticateToken, async (req, res) => {
+    try {
+        const { orderIds, takerIds } = req.body;
+
+        if (!orderIds || !takerIds || orderIds.length === 0 || takerIds.length === 0) {
+            return res.status(400).json({ error: 'orderIds and takerIds are required' });
+        }
+
+        // Fetch all orders with their items
+        const orders = await Order.findAll({
+            where: { id: orderIds },
+            include: [
+                { model: OrderItem, as: 'Items' },
+                { model: User, as: 'AssignedTakers', attributes: ['id', 'username', 'email'] }
+            ]
+        });
+
+        console.log(`Bulk email: Found ${orders.length} orders for ${orderIds.length} order IDs`);
+        orders.forEach((order, i) => {
+            console.log(`Order ${i + 1}: ${order.title}, Items: ${order.Items?.length || 0}`);
+        });
+
+        // Get sender info
+        const sender = await User.findByPk(req.user.id, { attributes: ['id', 'username', 'email'] });
+
+        // Get all takers
+        const takers = await User.findAll({
+            where: { id: takerIds },
+            attributes: ['id', 'username', 'email']
+        });
+
+        console.log(`Sending bulk email to ${takers.length} takers`);
+
+        // Send one email per taker with all their orders
+        for (const taker of takers) {
+            if (taker.email) {
+                console.log(`Sending bulk email to ${taker.email} with ${orders.length} orders`);
+                sendBulkOrdersEmail(orders, taker, sender).catch(err => {
+                    console.error(`Error sending bulk email to ${taker.email}:`, err);
+                });
+            }
+        }
+
+        res.json({ message: 'Bulk emails sent successfully', count: takers.length });
+    } catch (error) {
+        console.error('Error sending bulk emails:', error);
         res.status(500).json({ error: error.message });
     }
 });
