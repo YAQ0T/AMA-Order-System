@@ -7,7 +7,7 @@ import { useOrder } from '../context/OrderContext';
 
 const Layout = () => {
     const { user, logout, token } = useAuth();
-    const { fetchOrders } = useOrder();
+    const { fetchOrders, orderPagination } = useOrder();
     const [notifications, setNotifications] = useState([]);
     const [showNotifications, setShowNotifications] = useState(false);
     const unreadCount = notifications.filter(n => !n.isRead).length;
@@ -101,7 +101,7 @@ const Layout = () => {
         if (token) {
             const refreshData = () => {
                 fetchNotifications();
-                fetchOrders();
+                fetchOrders({ limit: orderPagination.limit, offset: orderPagination.offset });
             };
 
             refreshData();
@@ -114,7 +114,7 @@ const Layout = () => {
 
             return () => clearInterval(interval);
         }
-    }, [token, fetchOrders]);
+    }, [token, fetchOrders, orderPagination.limit, orderPagination.offset]);
 
     // Close notifications dropdown when clicking outside
     useEffect(() => {

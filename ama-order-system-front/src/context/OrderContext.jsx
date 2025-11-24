@@ -9,17 +9,27 @@ export const useOrder = () => useContext(OrderContext);
 export const OrderProvider = ({ children }) => {
   const { token, user } = useAuth();
   const [orders, setOrders] = useState([]);
+  const [orderPagination, setOrderPagination] = useState({ total: 0, limit: 20, offset: 0 });
   const [users, setUsers] = useState([]); // Takers list for Makers
 
-  const fetchOrders = useCallback(async () => {
+  const fetchOrders = useCallback(async (options = {}) => {
     if (!token) return;
     try {
-      const response = await fetch(`${API_BASE_URL}/api/orders`, {
+      const { limit = 20, offset = 0 } = options;
+      const params = new URLSearchParams({ limit, offset });
+
+      const response = await fetch(`${API_BASE_URL}/api/orders?${params.toString()}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (response.ok) {
         const data = await response.json();
-        setOrders(data);
+        if (Array.isArray(data)) {
+          setOrders(data);
+          setOrderPagination({ total: data.length, limit, offset });
+        } else {
+          setOrders(data.orders || []);
+          setOrderPagination(data.pagination || { total: data.orders?.length || 0, limit, offset });
+        }
       }
     } catch (error) {
       console.error('Failed to fetch orders', error);
@@ -141,7 +151,7 @@ export const OrderProvider = ({ children }) => {
   };
 
   return (
-    <OrderContext.Provider value={{ orders, users, createOrder, getOrdersForUser, updateOrderStatus, updateOrderDetails, deleteOrder, fetchOrders }}>
+    <OrderContext.Provider value={{ orders, orderPagination, users, createOrder, getOrdersForUser, updateOrderStatus, updateOrderDetails, deleteOrder, fetchOrders }}>
       {children}
     </OrderContext.Provider>
   );

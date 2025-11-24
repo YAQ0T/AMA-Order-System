@@ -90,54 +90,63 @@ router.post('/', authenticateToken, async (req, res) => {
 // Get Orders (For current user)
 router.get('/', authenticateToken, async (req, res) => {
     try {
-        let orders;
+        const limit = Math.min(parseInt(req.query.limit, 10) || 20, 100);
+        const offset = parseInt(req.query.offset, 10) || 0;
+
         const includeOptions = [
             { model: User, as: 'Maker', attributes: ['id', 'username', 'role'] },
-            { model: User, as: 'AssignedTakers', attributes: ['id', 'username'] },
+            { model: User, as: 'AssignedTakers', attributes: ['id', 'username'], through: { attributes: [] } },
             {
                 model: OrderLog,
                 as: 'History',
-                include: [{ model: User, as: 'Editor', attributes: ['username'] }]
-                // If you want ordered history, do it at top-level order instead of here
+                attributes: ['id', 'previousDescription', 'newDescription', 'createdAt', 'changedBy'],
+                include: [{ model: User, as: 'Editor', attributes: ['id', 'username'] }],
+                separate: true,
+                order: [['createdAt', 'DESC']]
             },
-            { model: OrderItem, as: 'Items' }
+            { model: OrderItem, as: 'Items', attributes: ['id', 'name', 'quantity'] }
         ];
+
+        let result;
 
         if (req.user.role === 'maker') {
             // Makers see orders they created
-            orders = await Order.findAll({
+            result = await Order.findAndCountAll({
                 where: { makerId: req.user.id },
                 include: includeOptions,
-                order: [['createdAt', 'DESC']]
+                order: [['createdAt', 'DESC']],
+                limit,
+                offset,
+                distinct: true
             });
         } else if (req.user.role === 'admin') {
-            orders = await Order.findAll({
+            result = await Order.findAndCountAll({
                 include: includeOptions,
-                order: [['createdAt', 'DESC']]
+                order: [['createdAt', 'DESC']],
+                limit,
+                offset,
+                distinct: true
             });
         } else {
             // Takers see orders assigned to them
-            const user = await User.findByPk(req.user.id, {
-                include: [{
-                    model: Order,
-                    as: 'AssignedOrders',
-                    include: [
-                        { model: User, as: 'Maker', attributes: ['id', 'username', 'role'] },
-                        { model: OrderItem, as: 'Items' },
-                        {
-                            model: OrderLog,
-                            as: 'History',
-                            include: [{ model: User, as: 'Editor', attributes: ['username'] }]
-                        },
-                        { model: User, as: 'AssignedTakers', attributes: ['id', 'username'] }
-                    ]
-                }],
-                order: [[{ model: Order, as: 'AssignedOrders' }, 'createdAt', 'ASC']]
+            result = await Order.findAndCountAll({
+                where: { '$AssignedTakers.id$': req.user.id },
+                include: includeOptions,
+                order: [['createdAt', 'DESC']],
+                limit,
+                offset,
+                distinct: true
             });
-            orders = user ? user.AssignedOrders : [];
         }
 
-        res.json(orders);
+        res.json({
+            orders: result.rows,
+            pagination: {
+                total: result.count,
+                limit,
+                offset
+            }
+        });
     } catch (error) {
         console.error('Error fetching orders:', error);
         res.status(500).json({ error: error.message });
