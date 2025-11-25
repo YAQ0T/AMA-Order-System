@@ -372,3 +372,68 @@ button {
     gap: 0.2rem;
   }
 }
+
+/* Accounter Dashboard Mobile Optimizations */
+@media (max-width: 480px) {
+  .accounter-dashboard {
+    padding: 0 0.5rem 1.5rem;
+  }
+
+  .accounter-dashboard .dashboard-header {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 1rem;
+    margin-bottom: 1rem !important;
+  }
+
+  .accounter-dashboard .dashboard-header>div:last-child {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem !important;
+  }
+
+  .accounter-dashboard .dashboard-header button {
+    padding: 0.4rem 0.2rem !important;
+    font-size: 0.75rem !important;
+    white-space: nowrap;
+    width: 100%;
+  }
+
+  .accounter-dashboard .glass-panel {
+    padding: 1rem !important;
+  }
+
+  .accounter-dashboard .order-items-table th,
+  .accounter-dashboard .order-items-table td {
+    padding: 0.4rem 0.25rem !important;
+    font-size: 0.85rem;
+  }
+}
+
+@media (max-width: 320px) {
+  .accounter-dashboard .glass-panel {
+    padding: 0.75rem !important;
+  }
+
+  .accounter-dashboard .dashboard-header h1 {
+    font-size: 1.25rem;
+  }
+
+  .accounter-dashboard .dashboard-header button {
+    font-size: 0.7rem !important;
+    padding: 0.3rem 0.1rem !important;
+  }
+
+  .accounter-dashboard .order-items-table th,
+  .accounter-dashboard .order-items-table td {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.1rem !important;
+  }
+
+  /* Make the 'Mark Entered to ERP' button smaller/icon-only if needed */
+  .accounter-dashboard .btn-primary {
+    padding: 0.4rem 0.6rem;
+    font-size: 0.8rem;
+  }
+}

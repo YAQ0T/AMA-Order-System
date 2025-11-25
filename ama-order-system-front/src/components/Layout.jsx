@@ -101,7 +101,6 @@ const Layout = () => {
         if (token) {
             const refreshData = () => {
                 fetchNotifications();
-                fetchOrders({ limit: orderPagination.limit, offset: orderPagination.offset });
             };
 
             refreshData();

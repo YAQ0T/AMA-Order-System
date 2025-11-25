@@ -1,14 +1,29 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useOrder } from '../context/OrderContext';
 
 const AccounterDashboard = () => {
     const { orders, orderPagination, fetchOrders, updateOrderStatus } = useOrder();
     const [filterStatus, setFilterStatus] = useState('all'); // 'all', 'completed', 'entered_erp'
+    const filterStatusRef = useRef(filterStatus);
+
+    // Keep ref in sync with state
+    useEffect(() => {
+        filterStatusRef.current = filterStatus;
+    }, [filterStatus]);
 
     useEffect(() => {
         const statusParam = filterStatus === 'all' ? undefined : filterStatus;
         fetchOrders({ limit: orderPagination.limit, offset: orderPagination.offset, status: statusParam });
     }, [fetchOrders, orderPagination.limit, orderPagination.offset, filterStatus]);
+
+    // Auto-refresh orders every 15 seconds using the ref
+    useEffect(() => {
+        const interval = setInterval(() => {
+            const currentStatusParam = filterStatusRef.current === 'all' ? undefined : filterStatusRef.current;
+            fetchOrders({ limit: orderPagination.limit, offset: orderPagination.offset, status: currentStatusParam });
+        }, 15000);
+        return () => clearInterval(interval);
+    }, [fetchOrders, orderPagination.limit, orderPagination.offset]);
 
     const completedOrders = orders;
 
@@ -34,7 +49,7 @@ const AccounterDashboard = () => {
     const end = totalOrders === 0 ? 0 : Math.min(totalOrders, (orderPagination.offset || 0) + limit);
 
     return (
-        <div style={{ maxWidth: '900px', margin: '0 auto' }}>
+        <div className="accounter-dashboard" style={{ maxWidth: '900px', margin: '0 auto' }}>
             <div className="dashboard-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
                 <div>
                     <h1>Accounter Dashboard</h1>

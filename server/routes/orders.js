@@ -172,15 +172,21 @@ router.get('/', authenticateToken, async (req, res) => {
             });
         } else if (req.user.role === 'accounter') {
             const allowedStatuses = ['completed', 'entered_erp'];
-            let statusFilter = { [Op.in]: allowedStatuses };
+            let statusFilter;
 
-            // If a specific status is requested and it's allowed, use it
-            if (where.status && allowedStatuses.includes(where.status)) {
-                statusFilter = where.status;
+            // If a specific status is requested via query parameter and it's allowed, use it
+            if (req.query.status && allowedStatuses.includes(req.query.status)) {
+                statusFilter = req.query.status;
+            } else {
+                // Default: show both completed and entered_erp
+                statusFilter = { [Op.in]: allowedStatuses };
             }
 
+            // Remove status from where to avoid conflicts
+            const { status, ...whereWithoutStatus } = where;
+
             const accounterWhere = {
-                ...where,
+                ...whereWithoutStatus,
                 accounterId: req.user.id,
                 status: statusFilter
             };

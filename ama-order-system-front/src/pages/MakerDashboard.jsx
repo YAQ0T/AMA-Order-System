@@ -43,6 +43,14 @@ const MakerDashboard = () => {
     const [selectedAccounter, setSelectedAccounter] = useState(null);
     const [showSuccess, setShowSuccess] = useState(false);
 
+    // Auto-refresh orders every 15 seconds
+    React.useEffect(() => {
+        const interval = setInterval(() => {
+            fetchOrders({ limit: orderPagination.limit, offset: orderPagination.offset });
+        }, 15000);
+        return () => clearInterval(interval);
+    }, [fetchOrders, orderPagination.limit, orderPagination.offset]);
+
     // Delete Modal State
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [orderToDelete, setOrderToDelete] = useState(null);
