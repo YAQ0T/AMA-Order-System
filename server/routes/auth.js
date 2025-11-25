@@ -109,4 +109,17 @@ router.get('/takers', async (req, res) => {
     }
 });
 
+// Get all accounters (for Makers to assign)
+router.get('/accounters', async (req, res) => {
+    try {
+        const accounters = await User.findAll({
+            where: { role: 'accounter' },
+            attributes: ['id', 'username', 'role']
+        });
+        res.json(accounters);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 module.exports = router;

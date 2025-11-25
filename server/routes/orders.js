@@ -7,6 +7,14 @@ const { Op } = require('sequelize');
 
 const router = express.Router();
 
+const getItemAttributesForRole = (role) => {
+    const baseAttributes = ['id', 'name', 'quantity', 'status', 'createdAt', 'updatedAt'];
+    if (['maker', 'admin', 'accounter'].includes(role)) {
+        return [...baseAttributes, 'price'];
+    }
+    return baseAttributes;
+};
+
 // Create Order (Maker only)
 router.post('/', authenticateToken, async (req, res) => {
     try {
@@ -14,7 +22,7 @@ router.post('/', authenticateToken, async (req, res) => {
             return res.status(403).json({ error: 'Only makers or admins can create orders' });
         }
 
-        const { title, description, assignedTakerIds, items, city, status } = req.body;
+        const { title, description, assignedTakerIds, items, city, status, accounterId } = req.body;
         console.log('Creating order:', { title, assignedTakerIds, makerId: req.user.id, city, status });
 
         let defaultDesc = 'New Order';
@@ -24,12 +32,20 @@ router.post('/', authenticateToken, async (req, res) => {
 
         const orderStatus = status === 'archived' ? 'archived' : 'pending';
 
+        if (accounterId) {
+            const accounter = await User.findByPk(accounterId);
+            if (!accounter || accounter.role !== 'accounter') {
+                return res.status(400).json({ error: 'Invalid accounter selection' });
+            }
+        }
+
         const order = await Order.create({
             title,
             description: description || defaultDesc,
             makerId: req.user.id,
             status: orderStatus,
-            city
+            city,
+            accounterId
         });
 
         // Only assign takers and notify if NOT archived
@@ -58,7 +74,8 @@ router.post('/', authenticateToken, async (req, res) => {
         if (items && items.length > 0) {
             const orderItems = items.map(item => ({
                 ...item,
-                orderId: order.id
+                orderId: order.id,
+                price: item.price === '' || item.price === undefined ? null : item.price
             }));
             await OrderItem.bulkCreate(orderItems);
         }
@@ -68,7 +85,8 @@ router.post('/', authenticateToken, async (req, res) => {
             include: [
                 { model: User, as: 'Maker', attributes: ['id', 'username'] },
                 { model: User, as: 'AssignedTakers', attributes: ['id', 'username', 'email'] },
-                { model: OrderItem, as: 'Items' }
+                { model: User, as: 'Accounter', attributes: ['id', 'username', 'role'] },
+                { model: OrderItem, as: 'Items', attributes: getItemAttributesForRole(req.user.role) }
             ]
         });
 
@@ -115,7 +133,8 @@ router.get('/', authenticateToken, async (req, res) => {
         const includeOptions = [
             { model: User, as: 'Maker', attributes: ['id', 'username', 'role'] },
             { model: User, as: 'AssignedTakers', attributes: ['id', 'username'], through: { attributes: [] } },
-            { model: OrderItem, as: 'Items', attributes: ['id', 'name', 'quantity', 'status', 'createdAt', 'updatedAt'] }
+            { model: User, as: 'Accounter', attributes: ['id', 'username', 'role'] },
+            { model: OrderItem, as: 'Items', attributes: getItemAttributesForRole(req.user.role) }
         ];
 
         if (includeHistory) {
@@ -135,6 +154,21 @@ router.get('/', authenticateToken, async (req, res) => {
             // Makers see orders they created
             result = await Order.findAndCountAll({
                 where: { ...where, makerId: req.user.id },
+                include: includeOptions,
+                order: [['createdAt', 'DESC']],
+                limit,
+                offset,
+                distinct: true
+            });
+        } else if (req.user.role === 'accounter') {
+            const accounterWhere = {
+                ...where,
+                accounterId: req.user.id,
+                status: { [Op.in]: ['completed', 'entered_erp'] }
+            };
+
+            result = await Order.findAndCountAll({
+                where: accounterWhere,
                 include: includeOptions,
                 order: [['createdAt', 'DESC']],
                 limit,
@@ -221,7 +255,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
         console.log(`PUT /api/orders/${req.params.id} hit by user: ${req.user.username} (${req.user.role})`);
         console.log('Request body:', req.body);
 
-        const { status, title, description, items, assignedTakerIds, skipEmail } = req.body;
+        const { status, title, description, items, assignedTakerIds, skipEmail, accounterId } = req.body;
 
         if (skipEmail) {
             console.log('⏭️ Skipping individual email (bulk send mode)');
@@ -237,6 +271,43 @@ router.put('/:id', authenticateToken, async (req, res) => {
 
         if (!order) {
             return res.status(404).json({ error: 'Order not found' });
+        }
+
+        if (req.user.role === 'accounter') {
+            if (order.accounterId !== req.user.id) {
+                return res.status(403).json({ error: 'Not authorized to process this order' });
+            }
+
+            if (status !== 'entered_erp') {
+                return res.status(400).json({ error: 'Accounter can only mark orders as entered to ERP' });
+            }
+
+            if (!['completed', 'entered_erp'].includes(order.status)) {
+                return res.status(400).json({ error: 'Order must be completed before entering ERP' });
+            }
+
+            if (order.status !== 'entered_erp') {
+                await OrderLog.create({
+                    orderId: order.id,
+                    previousDescription: order.status,
+                    newDescription: `Status: ${order.status} -> entered_erp`,
+                    changedBy: req.user.id
+                });
+            }
+
+            order.status = 'entered_erp';
+            await order.save();
+
+            const updatedOrder = await Order.findByPk(order.id, {
+                include: [
+                    { model: User, as: 'Maker', attributes: ['id', 'username', 'role', 'email'] },
+                    { model: User, as: 'AssignedTakers', attributes: ['id', 'username', 'email'] },
+                    { model: User, as: 'Accounter', attributes: ['id', 'username', 'role'] },
+                    { model: OrderItem, as: 'Items', attributes: getItemAttributesForRole(req.user.role) }
+                ]
+            });
+
+            return res.json(updatedOrder);
         }
 
         const isAdmin = req.user.role === 'admin';
@@ -269,6 +340,23 @@ router.put('/:id', authenticateToken, async (req, res) => {
                     changedBy: req.user.id
                 });
                 order.city = req.body.city;
+            }
+
+            // Handle Accounter assignment (Maker/Admin only)
+            if (req.body.accounterId !== undefined) {
+                if (!isMaker && !isAdmin) {
+                    return res.status(403).json({ error: 'Only makers or admins can assign an accounter' });
+                }
+
+                if (req.body.accounterId === null || req.body.accounterId === '') {
+                    order.accounterId = null;
+                } else {
+                    const newAccounter = await User.findByPk(req.body.accounterId);
+                    if (!newAccounter || newAccounter.role !== 'accounter') {
+                        return res.status(400).json({ error: 'Invalid accounter selected' });
+                    }
+                    order.accounterId = req.body.accounterId;
+                }
             }
 
             // Log Description Change
@@ -338,6 +426,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
                 const orderItems = items.map(item => ({
                     ...item,
                     orderId: order.id,
+                    price: item.price === '' || item.price === undefined ? null : item.price,
                     // Only preserve status if this item existed before (not a new addition)
                     status: isUpdate.get(item.name) ? (existingItemsStatus.get(item.name) || null) : null
                 }));
@@ -382,9 +471,9 @@ router.put('/:id', authenticateToken, async (req, res) => {
 
         // Handle Status Update
         if (status) {
-            // Validate entered_erp status can only be set by makers
-            if (status === 'entered_erp' && req.user.role !== 'maker' && req.user.role !== 'admin') {
-                return res.status(403).json({ error: 'Only makers can set status to "Entered into ERP"' });
+            // Validate entered_erp status can only be set by accounters or admins
+            if (status === 'entered_erp' && !['accounter', 'admin'].includes(req.user.role)) {
+                return res.status(403).json({ error: 'Only accounters can set status to "Entered into ERP"' });
             }
 
             const oldStatus = order.status;
@@ -467,6 +556,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
             include: [
                 { model: User, as: 'Maker', attributes: ['id', 'username', 'role', 'email'] },
                 { model: User, as: 'AssignedTakers', attributes: ['id', 'username', 'email'] },
+                { model: User, as: 'Accounter', attributes: ['id', 'username', 'role'] },
                 {
                     model: OrderLog,
                     as: 'History',
@@ -474,7 +564,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
                     limit: 5,
                     order: [['createdAt', 'DESC']]
                 },
-                { model: OrderItem, as: 'Items' }
+                { model: OrderItem, as: 'Items', attributes: getItemAttributesForRole(req.user.role) }
             ]
         });
 

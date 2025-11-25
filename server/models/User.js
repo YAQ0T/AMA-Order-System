@@ -13,7 +13,7 @@ module.exports = (sequelize) => {
             allowNull: false
         },
         role: {
-            type: DataTypes.ENUM('maker', 'taker', 'admin'),
+            type: DataTypes.ENUM('maker', 'taker', 'admin', 'accounter'),
             allowNull: false
         },
         isApproved: {

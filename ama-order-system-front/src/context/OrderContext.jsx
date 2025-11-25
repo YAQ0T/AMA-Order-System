@@ -42,13 +42,20 @@ export const OrderProvider = ({ children }) => {
   const fetchTakers = useCallback(async () => {
     if (!token || user?.role !== 'maker') return;
     try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/takers`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setUsers(data);
+      const [takersRes, accountersRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/api/auth/takers`, { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch(`${API_BASE_URL}/api/auth/accounters`, { headers: { 'Authorization': `Bearer ${token}` } })
+      ]);
+
+      const combined = [];
+      if (takersRes.ok) {
+        combined.push(...await takersRes.json());
       }
+      if (accountersRes.ok) {
+        combined.push(...await accountersRes.json());
+      }
+
+      setUsers(combined);
     } catch (error) {
       console.error('Failed to fetch takers', error);
     }

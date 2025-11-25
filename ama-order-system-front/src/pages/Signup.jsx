@@ -76,6 +76,17 @@ const Signup = () => {
                                 />
                                 Order Taker
                             </label>
+                            <label style={{ flex: 1, cursor: 'pointer' }}>
+                                <input
+                                    type="radio"
+                                    name="role"
+                                    value="accounter"
+                                    checked={role === 'accounter'}
+                                    onChange={(e) => setRole(e.target.value)}
+                                    style={{ marginRight: '0.5rem' }}
+                                />
+                                Accounter
+                            </label>
                         </div>
                     </div>
 
