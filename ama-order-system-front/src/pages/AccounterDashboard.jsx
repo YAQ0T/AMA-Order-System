@@ -108,22 +108,47 @@ const AccounterDashboard = () => {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {order.Items.map(item => (
-                                                <tr key={item.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                                                    <td style={{ padding: '0.5rem' }}>{item.name}</td>
-                                                    <td style={{ padding: '0.5rem', textAlign: 'center' }}>
-                                                        {item.status === 'collected' ? (
-                                                            <span style={{ color: '#34d399', fontSize: '1.2rem' }}>✓</span>
-                                                        ) : item.status === 'unavailable' ? (
-                                                            <span style={{ color: '#ef4444', fontSize: '1.2rem' }}>✕</span>
-                                                        ) : (
-                                                            <span style={{ color: 'var(--text-muted)' }}>-</span>
-                                                        )}
-                                                    </td>
-                                                    <td style={{ padding: '0.5rem', textAlign: 'right' }}>{item.quantity}</td>
-                                                    <td style={{ padding: '0.5rem', textAlign: 'right' }}>{item.price ? `${item.price} ₪` : '-'}</td>
-                                                </tr>
-                                            ))}
+                                            {order.Items.map(item => {
+                                                const getRowStyle = () => {
+                                                    const baseStyle = {
+                                                        borderBottom: '1px solid rgba(255,255,255,0.05)',
+                                                        transition: 'background-color 0.3s ease',
+                                                        borderLeft: '3px solid transparent'
+                                                    };
+
+                                                    if (item.status === 'collected') {
+                                                        return {
+                                                            ...baseStyle,
+                                                            backgroundColor: 'rgba(52, 211, 153, 0.15)',
+                                                            borderLeft: '3px solid #34d399'
+                                                        };
+                                                    } else if (item.status === 'unavailable') {
+                                                        return {
+                                                            ...baseStyle,
+                                                            backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                                                            borderLeft: '3px solid #ef4444'
+                                                        };
+                                                    }
+                                                    return baseStyle;
+                                                };
+
+                                                return (
+                                                    <tr key={item.id} style={getRowStyle()}>
+                                                        <td style={{ padding: '0.5rem' }}>{item.name}</td>
+                                                        <td style={{ padding: '0.5rem', textAlign: 'center' }}>
+                                                            {item.status === 'collected' ? (
+                                                                <span style={{ color: '#34d399', fontSize: '1.2rem' }}>✓</span>
+                                                            ) : item.status === 'unavailable' ? (
+                                                                <span style={{ color: '#ef4444', fontSize: '1.2rem' }}>✕</span>
+                                                            ) : (
+                                                                <span style={{ color: 'var(--text-muted)' }}>-</span>
+                                                            )}
+                                                        </td>
+                                                        <td style={{ padding: '0.5rem', textAlign: 'right' }}>{item.quantity}</td>
+                                                        <td style={{ padding: '0.5rem', textAlign: 'right' }}>{item.price ? `${item.price} ₪` : '-'}</td>
+                                                    </tr>
+                                                );
+                                            })}
                                         </tbody>
                                     </table>
                                 )}
