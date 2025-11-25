@@ -15,7 +15,8 @@ export const OrderProvider = ({ children }) => {
   const fetchOrders = useCallback(async (options = {}) => {
     if (!token) return;
     try {
-      const { limit = 20, offset = 0 } = options;
+      const limit = Math.min(Number.isFinite(options.limit) ? options.limit : 20, 20);
+      const offset = Math.max(Number.isFinite(options.offset) ? options.offset : 0, 0);
       const params = new URLSearchParams({ limit, offset });
 
       const response = await fetch(`${API_BASE_URL}/api/orders?${params.toString()}`, {
@@ -23,13 +24,15 @@ export const OrderProvider = ({ children }) => {
       });
       if (response.ok) {
         const data = await response.json();
+        const pagination = data.pagination || { total: data.orders?.length || data.length || 0, limit, offset };
+
         if (Array.isArray(data)) {
           setOrders(data);
-          setOrderPagination({ total: data.length, limit, offset });
         } else {
           setOrders(data.orders || []);
-          setOrderPagination(data.pagination || { total: data.orders?.length || 0, limit, offset });
         }
+
+        setOrderPagination({ ...pagination, limit, offset });
       }
     } catch (error) {
       console.error('Failed to fetch orders', error);
@@ -99,9 +102,11 @@ export const OrderProvider = ({ children }) => {
       });
 
       if (response.ok) {
+        const updatedOrder = await response.json();
         setOrders(prev => prev.map(order =>
-          order.id === orderId ? { ...order, status } : order
+          order.id === orderId ? updatedOrder : order
         ));
+        return true;
       }
     } catch (error) {
       console.error('Failed to update status', error);

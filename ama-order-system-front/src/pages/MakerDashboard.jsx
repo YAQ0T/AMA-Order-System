@@ -33,7 +33,7 @@ const ConfirmModal = ({ isOpen, onClose, onConfirm, title, message }) => {
 };
 
 const MakerDashboard = () => {
-    const { users, createOrder, orders, updateOrderDetails, deleteOrder, updateOrderStatus } = useOrder();
+    const { users, createOrder, orders, updateOrderDetails, deleteOrder, updateOrderStatus, orderPagination, fetchOrders } = useOrder();
     const { token } = useAuth();
     const [title, setTitle] = useState('');
     const [note, setNote] = useState('');
@@ -80,6 +80,11 @@ const MakerDashboard = () => {
     // Product & Title Suggestions
     const [productSuggestions, setProductSuggestions] = useState([]);
     const [titleSuggestions, setTitleSuggestions] = useState([]);
+
+    const filterButtonStyle = {
+        padding: '0.35rem 0.75rem',
+        fontSize: '0.9rem'
+    };
 
     const fetchProductSuggestions = async (query) => {
         if (!query || query.length < 2) {
@@ -331,6 +336,9 @@ const MakerDashboard = () => {
 
     // Filter Orders
     const filteredOrders = orders.filter(order => {
+        if (orderFilter === 'all') {
+            return true;
+        }
         if (orderFilter === 'archived') {
             return order.status === 'archived';
         }
@@ -370,6 +378,18 @@ const MakerDashboard = () => {
         if (!confirmed) return;
 
         await updateOrderStatus(order.id, 'entered_erp');
+    };
+
+    const limit = orderPagination.limit || 20;
+    const totalOrders = orderPagination.total || orders.length;
+    const totalPages = Math.max(1, Math.ceil(totalOrders / limit));
+    const currentPage = Math.min(Math.floor((orderPagination.offset || 0) / limit) + 1, totalPages);
+    const pageStart = totalOrders === 0 ? 0 : (currentPage - 1) * limit + 1;
+    const pageEnd = Math.min(totalOrders, currentPage * limit);
+
+    const handlePageChange = (page) => {
+        const newPage = Math.min(Math.max(page, 1), totalPages);
+        fetchOrders({ limit, offset: (newPage - 1) * limit });
     };
 
     return (
@@ -526,33 +546,40 @@ const MakerDashboard = () => {
             )}
             <div style={{ marginTop: '3rem' }}>
                 {/* Orders List */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                    <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <button
+                            className={`btn-secondary ${orderFilter === 'all' ? 'active' : ''}`}
+                            onClick={() => setOrderFilter('all')}
+                            style={{ ...filterButtonStyle, borderColor: orderFilter === 'all' ? 'var(--primary)' : undefined }}
+                        >
+                            All Orders
+                        </button>
                         <button
                             className={`btn-secondary ${orderFilter === 'active' ? 'active' : ''}`}
                             onClick={() => setOrderFilter('active')}
-                            style={{ borderColor: orderFilter === 'active' ? 'var(--primary)' : undefined }}
+                            style={{ ...filterButtonStyle, borderColor: orderFilter === 'active' ? 'var(--primary)' : undefined }}
                         >
                             Active Orders
                         </button>
                         <button
                             className={`btn-secondary ${orderFilter === 'completed' ? 'active' : ''}`}
                             onClick={() => setOrderFilter('completed')}
-                            style={{ borderColor: orderFilter === 'completed' ? 'var(--primary)' : undefined }}
+                            style={{ ...filterButtonStyle, borderColor: orderFilter === 'completed' ? 'var(--primary)' : undefined }}
                         >
                             ✅ Completed Orders
                         </button>
                         <button
                             className={`btn-secondary ${orderFilter === 'entered_erp' ? 'active' : ''}`}
                             onClick={() => setOrderFilter('entered_erp')}
-                            style={{ borderColor: orderFilter === 'entered_erp' ? 'var(--primary)' : undefined }}
+                            style={{ ...filterButtonStyle, borderColor: orderFilter === 'entered_erp' ? 'var(--primary)' : undefined }}
                         >
                             🧾 Entered to ERP Orders
                         </button>
                         <button
                             className={`btn-secondary ${orderFilter === 'archived' ? 'active' : ''}`}
                             onClick={() => setOrderFilter('archived')}
-                            style={{ borderColor: orderFilter === 'archived' ? 'var(--primary)' : undefined }}
+                            style={{ ...filterButtonStyle, borderColor: orderFilter === 'archived' ? 'var(--primary)' : undefined }}
                         >
                             📂 Archived Orders
                         </button>
@@ -573,6 +600,33 @@ const MakerDashboard = () => {
                             onChange={(e) => setSearchTerm(e.target.value)}
                             style={{ width: '250px' }}
                         />
+                    </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', gap: '1rem', flexWrap: 'wrap' }}>
+                    <div style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>
+                        Showing {pageStart}-{pageEnd} of {totalOrders} orders
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <button
+                            className="btn-secondary"
+                            style={{ ...filterButtonStyle, opacity: currentPage === 1 ? 0.6 : 1 }}
+                            onClick={() => handlePageChange(currentPage - 1)}
+                            disabled={currentPage === 1}
+                        >
+                            Previous
+                        </button>
+                        <span style={{ color: 'var(--text-muted)', minWidth: '90px', textAlign: 'center', fontSize: '0.95rem' }}>
+                            Page {currentPage} / {totalPages}
+                        </span>
+                        <button
+                            className="btn-secondary"
+                            style={{ ...filterButtonStyle, opacity: currentPage === totalPages ? 0.6 : 1 }}
+                            onClick={() => handlePageChange(currentPage + 1)}
+                            disabled={currentPage === totalPages}
+                        >
+                            Next
+                        </button>
                     </div>
                 </div>
 
