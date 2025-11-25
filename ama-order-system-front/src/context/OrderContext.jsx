@@ -40,7 +40,9 @@ export const OrderProvider = ({ children }) => {
   }, [token]);
 
   const fetchTakers = useCallback(async () => {
-    if (!token || user?.role !== 'maker') return;
+    const isMakerOrAdmin = user?.role === 'maker' || user?.role === 'admin';
+
+    if (!token || !isMakerOrAdmin) return;
     try {
       const [takersRes, accountersRes] = await Promise.all([
         fetch(`${API_BASE_URL}/api/auth/takers`, { headers: { 'Authorization': `Bearer ${token}` } }),
