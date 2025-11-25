@@ -36,6 +36,10 @@ Order.belongsTo(User, { as: 'Maker', foreignKey: 'makerId' });
 User.belongsToMany(Order, { through: OrderAssignments, as: 'AssignedOrders', foreignKey: 'userId' });
 Order.belongsToMany(User, { through: OrderAssignments, as: 'AssignedTakers', foreignKey: 'orderId' });
 
+// User <-> Order (Accounter)
+User.hasMany(Order, { as: 'AssignedAccountingOrders', foreignKey: 'accounterId' });
+Order.belongsTo(User, { as: 'Accounter', foreignKey: 'accounterId' });
+
 // Order <-> OrderItem
 Order.hasMany(OrderItem, { as: 'Items', foreignKey: 'orderId' });
 OrderItem.belongsTo(Order, { foreignKey: 'orderId' });

@@ -15,6 +15,11 @@ module.exports = (sequelize) => {
             type: DataTypes.ENUM('collected', 'unavailable'),
             allowNull: true,
             defaultValue: null
+        },
+        price: {
+            type: DataTypes.DECIMAL(10, 2),
+            allowNull: true,
+            defaultValue: null
         }
     });
 

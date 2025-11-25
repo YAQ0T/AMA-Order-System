@@ -20,6 +20,14 @@ module.exports = (sequelize) => {
             validate: {
                 isIn: [['نابلس', 'الخليل', 'جنين', 'طولكرم', 'بديا', 'قلقيليا', 'رامالله', 'بيت لحم', 'الداخل']]
             }
+        },
+        accounterId: {
+            type: DataTypes.INTEGER,
+            allowNull: true,
+            references: {
+                model: 'Users',
+                key: 'id'
+            }
         }
     }, {
         indexes: [
@@ -31,6 +39,9 @@ module.exports = (sequelize) => {
             },
             {
                 fields: ['makerId']
+            },
+            {
+                fields: ['accounterId']
             },
             {
                 fields: ['createdAt']

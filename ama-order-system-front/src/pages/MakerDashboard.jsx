@@ -38,8 +38,9 @@ const MakerDashboard = () => {
     const [title, setTitle] = useState('');
     const [note, setNote] = useState('');
     const [city, setCity] = useState('نابلس');
-    const [items, setItems] = useState([{ name: '', quantity: 1 }]);
+    const [items, setItems] = useState([{ name: '', quantity: 1, price: '' }]);
     const [selectedTakers, setSelectedTakers] = useState([]);
+    const [selectedAccounter, setSelectedAccounter] = useState(null);
     const [showSuccess, setShowSuccess] = useState(false);
 
     // Delete Modal State
@@ -65,6 +66,7 @@ const MakerDashboard = () => {
     const [editCity, setEditCity] = useState('');
     const [editItems, setEditItems] = useState([]);
     const [editSelectedTakers, setEditSelectedTakers] = useState([]);
+    const [editAccounter, setEditAccounter] = useState(null);
     const [expandedHistoryId, setExpandedHistoryId] = useState(null);
 
     const [searchTerm, setSearchTerm] = useState('');
@@ -123,7 +125,7 @@ const MakerDashboard = () => {
     const cities = ['نابلس', 'الخليل', 'جنين', 'طولكرم', 'بديا', 'قلقيليا', 'رامالله', 'بيت لحم', 'الداخل'];
 
     const handleAddItem = () => {
-        setItems([...items, { name: '', quantity: 1 }]);
+        setItems([...items, { name: '', quantity: 1, price: '' }]);
     };
 
     const handleRemoveItem = (index) => {
@@ -150,7 +152,11 @@ const MakerDashboard = () => {
 
     const handleItemChange = (index, field, value) => {
         const newItems = [...items];
-        newItems[index][field] = value;
+        if (field === 'price') {
+            newItems[index][field] = value === '' ? '' : Number(value);
+        } else {
+            newItems[index][field] = value;
+        }
         setItems(newItems);
     };
 
@@ -175,7 +181,8 @@ const MakerDashboard = () => {
             title,
             items,
             city,
-            status: isArchived ? 'archived' : 'pending'
+            status: isArchived ? 'archived' : 'pending',
+            accounterId: selectedAccounter || null
         };
 
         const success = await createOrder(payload, validTakers);
@@ -183,8 +190,9 @@ const MakerDashboard = () => {
             setTitle('');
             setNote('');
             setCity('نابلس');
-            setItems([{ name: '', quantity: 1 }]);
+            setItems([{ name: '', quantity: 1, price: '' }]);
             setSelectedTakers([]);
+            setSelectedAccounter(null);
             setShowSuccess(true);
             setTimeout(() => setShowSuccess(false), 3000);
         }
@@ -201,7 +209,8 @@ const MakerDashboard = () => {
             title: editTitle,
             city: editCity,
             items: editItems,
-            assignedTakerIds: editSelectedTakers
+            assignedTakerIds: editSelectedTakers,
+            accounterId: editAccounter || null
         });
         if (success) {
             setEditingOrderId(null);
@@ -209,6 +218,7 @@ const MakerDashboard = () => {
             setEditCity('');
             setEditItems([]);
             setEditSelectedTakers([]);
+            setEditAccounter(null);
         }
     };
 
@@ -216,8 +226,9 @@ const MakerDashboard = () => {
         setEditingOrderId(order.id);
         setEditTitle(order.title || '');
         setEditCity(order.city || 'نابلس');
-        setEditItems(order.Items ? order.Items.map(i => ({ name: i.name, quantity: i.quantity })) : []);
+        setEditItems(order.Items ? order.Items.map(i => ({ name: i.name, quantity: i.quantity, price: i.price ?? '' })) : []);
         setEditSelectedTakers(order.AssignedTakers ? order.AssignedTakers.map(t => t.id) : []);
+        setEditAccounter(order.Accounter?.id || null);
     };
 
     const toggleTaker = (takerId) => {
@@ -232,7 +243,7 @@ const MakerDashboard = () => {
     };
 
     const handleEditAddItem = () => {
-        setEditItems([...editItems, { name: '', quantity: 1 }]);
+        setEditItems([...editItems, { name: '', quantity: 1, price: '' }]);
     };
 
     const handleEditRemoveItem = (index) => {
@@ -241,7 +252,11 @@ const MakerDashboard = () => {
 
     const handleEditItemChange = (index, field, value) => {
         const newItems = [...editItems];
-        newItems[index][field] = value;
+        if (field === 'price') {
+            newItems[index][field] = value === '' ? '' : Number(value);
+        } else {
+            newItems[index][field] = value;
+        }
         setEditItems(newItems);
     };
 
@@ -373,13 +388,6 @@ const MakerDashboard = () => {
         return grouped;
     }, [filteredOrders, orderFilter]);
 
-    const handleSendToErp = async (order) => {
-        const confirmed = window.confirm('Are you sure you want to send this order to ERP?');
-        if (!confirmed) return;
-
-        await updateOrderStatus(order.id, 'entered_erp');
-    };
-
     const limit = orderPagination.limit || 20;
     const totalOrders = orderPagination.total || orders.length;
     const totalPages = Math.max(1, Math.ceil(totalOrders / limit));
@@ -426,16 +434,23 @@ const MakerDashboard = () => {
                         </div>
                         <div style={{ flex: 1 }}>
                             <label style={{ display: 'block', marginBottom: '0.5rem' }}>City</label>
-                            <select
-                                className="input-field"
-                                value={city}
-                                onChange={(e) => setCity(e.target.value)}
-                                required
-                            >
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
                                 {cities.map(c => (
-                                    <option key={c} value={c}>{c}</option>
+                                    <button
+                                        key={c}
+                                        type="button"
+                                        onClick={() => setCity(c)}
+                                        className={`btn-secondary ${city === c ? 'active' : ''}`}
+                                        style={{
+                                            padding: '0.4rem 0.75rem',
+                                            borderColor: city === c ? 'var(--primary)' : 'var(--glass-border)',
+                                            background: city === c ? 'rgba(251, 191, 36, 0.1)' : 'transparent'
+                                        }}
+                                    >
+                                        {c}
+                                    </button>
                                 ))}
-                            </select>
+                            </div>
                         </div>
                     </div>
 
@@ -483,6 +498,16 @@ const MakerDashboard = () => {
                                         required
                                         style={{ flex: 0.5 }}
                                     />
+                                    <input
+                                        type="number"
+                                        className="input-field"
+                                        placeholder="Price (optional)"
+                                        value={item.price}
+                                        onChange={(e) => handleItemChange(index, 'price', e.target.value === '' ? '' : parseFloat(e.target.value))}
+                                        min="0"
+                                        step="0.01"
+                                        style={{ flex: 0.8 }}
+                                    />
                                     {items.length > 1 && (
                                         <button type="button" onClick={() => handleRemoveItem(index)} className="btn-secondary" style={{ color: '#ef4444', borderColor: '#ef4444' }}>
                                             ✕
@@ -515,6 +540,28 @@ const MakerDashboard = () => {
                             ))}
                         </div>
                     </div>
+
+                    {users.some(u => u.role === 'accounter') && (
+                        <div style={{ marginBottom: '1.5rem' }}>
+                            <label style={{ display: 'block', marginBottom: '0.5rem' }}>Assign Accounter (optional)</label>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                                {users.filter(u => u.role === 'accounter').map(accounter => (
+                                    <button
+                                        key={accounter.id}
+                                        type="button"
+                                        onClick={() => setSelectedAccounter(accounter.id === selectedAccounter ? null : accounter.id)}
+                                        className={`btn-secondary ${selectedAccounter === accounter.id ? 'active' : ''}`}
+                                        style={{
+                                            borderColor: selectedAccounter === accounter.id ? 'var(--primary)' : 'var(--glass-border)',
+                                            background: selectedAccounter === accounter.id ? 'rgba(251, 191, 36, 0.1)' : 'transparent'
+                                        }}
+                                    >
+                                        {accounter.username}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
                     <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
                         <button type="submit" className="btn-primary" style={{ flex: 1 }}>
@@ -675,16 +722,23 @@ const MakerDashboard = () => {
                                                                 placeholder="Customer name"
                                                                 style={{ flex: 1 }}
                                                             />
-                                                            <select
-                                                                className="input-field"
-                                                                value={editCity}
-                                                                onChange={(e) => setEditCity(e.target.value)}
-                                                                style={{ width: '120px' }}
-                                                            >
+                                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
                                                                 {cities.map(c => (
-                                                                    <option key={c} value={c}>{c}</option>
+                                                                    <button
+                                                                        key={c}
+                                                                        type="button"
+                                                                        onClick={() => setEditCity(c)}
+                                                                        className={`btn-secondary ${editCity === c ? 'active' : ''}`}
+                                                                        style={{
+                                                                            padding: '0.35rem 0.6rem',
+                                                                            borderColor: editCity === c ? 'var(--primary)' : 'var(--glass-border)',
+                                                                            background: editCity === c ? 'rgba(251, 191, 36, 0.1)' : 'transparent'
+                                                                        }}
+                                                                    >
+                                                                        {c}
+                                                                    </button>
                                                                 ))}
-                                                            </select>
+                                                            </div>
                                                         </div>
 
                                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -698,20 +752,30 @@ const MakerDashboard = () => {
                                                                         onChange={(e) => handleEditItemChange(index, 'name', e.target.value)}
                                                                         style={{ flex: 2 }}
                                                                     />
-                                                                    <input
-                                                                        type="number"
-                                                                        className="input-field"
-                                                                        placeholder="Qty"
-                                                                        value={item.quantity}
-                                                                        onChange={(e) => handleEditItemChange(index, 'quantity', parseInt(e.target.value))}
-                                                                        min="1"
-                                                                        style={{ flex: 0.5 }}
-                                                                    />
-                                                                    <button type="button" onClick={() => handleEditRemoveItem(index)} className="btn-secondary" style={{ color: '#ef4444', borderColor: '#ef4444' }}>
-                                                                        ✕
-                                                                    </button>
-                                                                </div>
-                                                            ))}
+                                                                <input
+                                                                    type="number"
+                                                                    className="input-field"
+                                                                    placeholder="Qty"
+                                                                    value={item.quantity}
+                                                                    onChange={(e) => handleEditItemChange(index, 'quantity', parseInt(e.target.value))}
+                                                                    min="1"
+                                                                    style={{ flex: 0.5 }}
+                                                                />
+                                                                <input
+                                                                    type="number"
+                                                                    className="input-field"
+                                                                    placeholder="Price (optional)"
+                                                                    value={item.price}
+                                                                    onChange={(e) => handleEditItemChange(index, 'price', e.target.value === '' ? '' : parseFloat(e.target.value))}
+                                                                    min="0"
+                                                                    step="0.01"
+                                                                    style={{ flex: 0.8 }}
+                                                                />
+                                                                <button type="button" onClick={() => handleEditRemoveItem(index)} className="btn-secondary" style={{ color: '#ef4444', borderColor: '#ef4444' }}>
+                                                                    ✕
+                                                                </button>
+                                                            </div>
+                                                        ))}
                                                             <button type="button" onClick={handleEditAddItem} className="btn-secondary" style={{ alignSelf: 'flex-start', marginTop: '0.5rem' }}>
                                                                 + Add Item
                                                             </button>
@@ -774,16 +838,23 @@ const MakerDashboard = () => {
                                                         placeholder="Customer name"
                                                         style={{ padding: '0.2rem 0.5rem', fontSize: '1rem' }}
                                                     />
-                                                    <select
-                                                        className="input-field"
-                                                        value={editCity}
-                                                        onChange={(e) => setEditCity(e.target.value)}
-                                                        style={{ padding: '0.2rem 0.5rem', fontSize: '1rem', width: '120px' }}
-                                                    >
+                                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
                                                         {cities.map(c => (
-                                                            <option key={c} value={c}>{c}</option>
+                                                            <button
+                                                                key={c}
+                                                                type="button"
+                                                                onClick={() => setEditCity(c)}
+                                                                className={`btn-secondary ${editCity === c ? 'active' : ''}`}
+                                                                style={{
+                                                                    padding: '0.35rem 0.6rem',
+                                                                    borderColor: editCity === c ? 'var(--primary)' : 'var(--glass-border)',
+                                                                    background: editCity === c ? 'rgba(251, 191, 36, 0.1)' : 'transparent'
+                                                                }}
+                                                            >
+                                                                {c}
+                                                            </button>
                                                         ))}
-                                                    </select>
+                                                    </div>
                                                 </div>
                                             ) : (
                                                 <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -796,16 +867,6 @@ const MakerDashboard = () => {
                                                 </div>
                                             )}
                                         </div>
-                                        {editingOrderId !== order.id && (
-                                            <button
-                                                className="btn-primary"
-                                                onClick={() => handleSendToErp(order)}
-                                                disabled={order.status === 'entered_erp' || order.status === 'archived'}
-                                                style={{ padding: '0.4rem 0.75rem', fontSize: '0.85rem' }}
-                                            >
-                                                {order.status === 'entered_erp' ? 'Entered to ERP' : 'Send to ERP'}
-                                            </button>
-                                        )}
                                     </div>
                                     <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
                                         {editingOrderId !== order.id ? (
@@ -833,7 +894,6 @@ const MakerDashboard = () => {
                                                 <option value="pending">Pending</option>
                                                 <option value="in-progress">In Progress</option>
                                                 <option value="completed">Completed</option>
-                                                <option value="entered_erp">Entered into ERP</option>
                                                 <option value="archived">Archived</option>
                                             </select>
                                         )}
@@ -886,6 +946,16 @@ const MakerDashboard = () => {
                                                             min="1"
                                                             style={{ flex: 0.5 }}
                                                         />
+                                                        <input
+                                                            type="number"
+                                                            className="input-field"
+                                                            placeholder="Price (optional)"
+                                                            value={item.price}
+                                                            onChange={(e) => handleEditItemChange(index, 'price', e.target.value === '' ? '' : parseFloat(e.target.value))}
+                                                            min="0"
+                                                            step="0.01"
+                                                            style={{ flex: 0.8 }}
+                                                        />
                                                         <button type="button" onClick={() => handleEditRemoveItem(index)} className="btn-secondary" style={{ color: '#ef4444', borderColor: '#ef4444' }}>
                                                             ✕
                                                         </button>
@@ -918,6 +988,30 @@ const MakerDashboard = () => {
                                                 </div>
                                             </div>
 
+                                            {users.some(u => u.role === 'accounter') && (
+                                                <div style={{ marginTop: '1rem' }}>
+                                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem' }}>Accounter</label>
+                                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                                                        {users.filter(u => u.role === 'accounter').map(accounter => (
+                                                            <button
+                                                                key={accounter.id}
+                                                                type="button"
+                                                                onClick={() => setEditAccounter(accounter.id === editAccounter ? null : accounter.id)}
+                                                                className={`btn-secondary ${editAccounter === accounter.id ? 'active' : ''}`}
+                                                                style={{
+                                                                    borderColor: editAccounter === accounter.id ? 'var(--primary)' : 'var(--glass-border)',
+                                                                    background: editAccounter === accounter.id ? 'rgba(251, 191, 36, 0.1)' : 'transparent',
+                                                                    fontSize: '0.8rem',
+                                                                    padding: '0.3rem 0.6rem'
+                                                                }}
+                                                            >
+                                                                {accounter.username}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+
                                             <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
                                                 <button onClick={() => handleUpdate(order.id)} className="btn-primary" style={{ padding: '0.5rem 1rem' }}>Save Changes</button>
                                                 <button onClick={() => setEditingOrderId(null)} className="btn-secondary" style={{ padding: '0.5rem 1rem' }}>Cancel</button>
@@ -929,12 +1023,19 @@ const MakerDashboard = () => {
                                                 <p style={{ fontSize: '1rem', marginBottom: '1rem', fontStyle: 'italic', color: 'var(--text-muted)' }}>{order.description}</p>
                                             )}
 
+                                            {order.Accounter && (
+                                                <div style={{ marginBottom: '0.75rem', color: 'var(--text-muted)' }}>
+                                                    🧾 Accounter: <span style={{ color: 'var(--text-main)', fontWeight: 600 }}>{order.Accounter.username}</span>
+                                                </div>
+                                            )}
+
                                             {order.Items && order.Items.length > 0 && (
                                                 <table className="order-items-table" style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '1rem' }}>
                                                     <thead>
                                                         <tr style={{ borderBottom: '1px solid var(--glass-border)', textAlign: 'left' }}>
                                                             <th style={{ padding: '0.5rem', color: 'var(--text-muted)' }}>Product</th>
                                                             <th style={{ padding: '0.5rem', color: 'var(--text-muted)', textAlign: 'right' }}>Qty</th>
+                                                            <th style={{ padding: '0.5rem', color: 'var(--text-muted)', textAlign: 'right' }}>Price</th>
                                                             <th style={{ padding: '0.5rem', color: 'var(--text-muted)', textAlign: 'center' }}>Status</th>
                                                         </tr>
                                                     </thead>
@@ -974,6 +1075,9 @@ const MakerDashboard = () => {
                                                                         textAlign: 'right',
                                                                         opacity: item.status === 'unavailable' ? 0.6 : 1
                                                                     }}>{item.quantity}</td>
+                                                                    <td style={{ padding: '0.5rem', textAlign: 'right', opacity: item.status === 'unavailable' ? 0.6 : 1 }}>
+                                                                        {item.price !== null && item.price !== undefined && item.price !== '' ? `${item.price} ₪` : '-'}
+                                                                    </td>
                                                                     <td style={{ padding: '0.5rem', textAlign: 'center' }}>
                                                                         {item.status === 'collected' && (
                                                                             <span style={{ color: '#34d399', fontSize: '1.2rem' }} title="Collected">✓</span>

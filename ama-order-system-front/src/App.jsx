@@ -9,6 +9,7 @@ import MakerDashboard from './pages/MakerDashboard';
 import TakerDashboard from './pages/TakerDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import PendingApproval from './pages/PendingApproval';
+import AccounterDashboard from './pages/AccounterDashboard';
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const { user, loading } = useAuth();
@@ -32,6 +33,7 @@ const HomeRedirect = () => {
   if (user.role === 'admin') return <Navigate to="/admin" />;
   if (user.role === 'maker') return <Navigate to="/maker" />;
   if (user.role === 'taker') return <Navigate to="/taker" />;
+  if (user.role === 'accounter') return <Navigate to="/accounter" />;
 
   return <Navigate to="/login" />;
 };
@@ -66,6 +68,12 @@ function App() {
               <Route path="taker" element={
                 <ProtectedRoute allowedRoles="taker">
                   <TakerDashboard />
+                </ProtectedRoute>
+              } />
+
+              <Route path="accounter" element={
+                <ProtectedRoute allowedRoles="accounter">
+                  <AccounterDashboard />
                 </ProtectedRoute>
               } />
             </Route>

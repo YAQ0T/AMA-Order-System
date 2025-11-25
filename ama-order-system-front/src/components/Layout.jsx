@@ -277,6 +277,16 @@ const Layout = () => {
                                         📦 Dashboard
                                     </Link>
                                 )}
+                                {user.role === 'taker' && (
+                                    <Link to="/taker" className="btn-primary" style={{ padding: '0.5rem 1rem', textDecoration: 'none' }}>
+                                        🛠 Dashboard
+                                    </Link>
+                                )}
+                                {user.role === 'accounter' && (
+                                    <Link to="/accounter" className="btn-primary" style={{ padding: '0.5rem 1rem', textDecoration: 'none' }}>
+                                        🧾 Accounter
+                                    </Link>
+                                )}
                                 <button onClick={logout} className="btn-secondary" style={{ padding: '0.5rem 1rem' }}>Logout</button>
                             </div>
                         </>
