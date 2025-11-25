@@ -382,8 +382,8 @@ const MakerDashboard = () => {
         if (orderFilter === 'entered_erp') {
             return order.status === 'entered_erp';
         }
-        // Active orders exclude archived and completed entries
-        return order.status !== 'archived' && order.status !== 'completed';
+        // Active orders exclude archived, completed, and ERP-entered entries
+        return order.status !== 'archived' && order.status !== 'completed' && order.status !== 'entered_erp';
     }).filter(order => {
         const searchLower = searchTerm.toLowerCase();
         const matchesTitle = (order.title || '').toLowerCase().includes(searchLower);
