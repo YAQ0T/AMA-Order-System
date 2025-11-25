@@ -108,6 +108,10 @@ button {
   justify-content: center;
 }
 
+.taker-dashboard .taker-order-card {
+  width: 100%;
+}
+
 .container {
   max-width: 1200px;
   margin: 0 auto;
@@ -262,5 +266,58 @@ button {
   #root {
     width: 100%;
     overflow-x: hidden;
+  }
+}
+
+@media (max-width: 480px) {
+  .taker-dashboard {
+    padding: 0 0.75rem 1.5rem;
+  }
+
+  .taker-dashboard header {
+    gap: 0.5rem;
+  }
+
+  .taker-dashboard h1 {
+    font-size: 1.35rem;
+  }
+
+  .taker-dashboard .taker-order-card {
+    padding: 1rem !important;
+  }
+
+  .taker-dashboard .order-controls {
+    gap: 0.5rem;
+  }
+
+  .taker-dashboard .order-controls select {
+    font-size: 0.85rem;
+    padding: 0.35rem;
+  }
+
+  .taker-dashboard .order-controls button {
+    padding: 0.3rem 0.6rem;
+    font-size: 0.8rem;
+  }
+
+  .taker-dashboard .order-items-table tr {
+    padding: 0.6rem 0.75rem;
+  }
+
+  .taker-dashboard .order-items-table .item-name {
+    font-size: 0.9rem;
+  }
+
+  .taker-dashboard .order-items-table .item-qty {
+    font-size: 0.85rem;
+  }
+
+  .taker-dashboard .status-actions {
+    gap: 0.35rem;
+  }
+
+  .taker-dashboard .status-action-btn {
+    min-width: 36px;
+    padding: 0.2rem 0.45rem;
   }
 }

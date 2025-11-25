@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useOrder } from '../context/OrderContext';
 import { updateItemStatus } from '../utils/api';
 
@@ -23,6 +23,10 @@ const TakerDashboard = () => {
     // Hide ERP-entered orders and filter out completed entries
     const visibleOrders = orders.filter(order => order.status !== 'entered_erp');
     const activeOrders = visibleOrders.filter(order => order.status !== 'completed');
+    const orderedActiveOrders = useMemo(
+        () => [...activeOrders].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)),
+        [activeOrders]
+    );
 
     // Edit State
     const [editingOrderId, setEditingOrderId] = useState(null);
@@ -95,7 +99,7 @@ const TakerDashboard = () => {
 
     return (
         <div className="taker-dashboard" style={{ maxWidth: '1000px', margin: '0 auto' }}>
-            <header style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <header style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
                 <div>
                     <h1>My Assigned Orders</h1>
                     <p style={{ color: 'var(--text-muted)' }}>Manage and update your tasks.</p>
@@ -143,12 +147,12 @@ const TakerDashboard = () => {
             </div>
 
             <div style={{ display: 'grid', gap: '1.5rem' }}>
-                {activeOrders.length === 0 ? (
+                {orderedActiveOrders.length === 0 ? (
                     <div className="glass-panel" style={{ padding: '3rem', textAlign: 'center' }}>
                         <p style={{ fontSize: '1.2rem', color: 'var(--text-muted)' }}>No active orders assigned to you.</p>
                     </div>
                 ) : (
-                    activeOrders.map(order => {
+                    orderedActiveOrders.map(order => {
                         const isAdminOrder = order.Maker?.role === 'admin';
                         const statusColor = order.status === 'completed' ? '#34d399' :
                             order.status === 'in-progress' ? '#fbbf24' :
@@ -156,7 +160,7 @@ const TakerDashboard = () => {
                         const borderColor = isAdminOrder ? '#ef4444' : statusColor;
 
                         return (
-                            <div key={order.id} className="glass-panel" style={{ padding: '1.5rem', borderLeft: `4px solid ${borderColor}` }}>
+                            <div key={order.id} className="glass-panel taker-order-card" style={{ padding: '1.5rem', borderLeft: `4px solid ${borderColor}` }}>
                                 <div className="order-header" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                                         <span style={{ fontFamily: 'monospace', background: 'rgba(255,255,255,0.1)', padding: '0.2rem 0.5rem', borderRadius: '4px' }}>
@@ -263,7 +267,9 @@ const TakerDashboard = () => {
                                                         </tr>
                                                     </thead>
                                                     <tbody>
-                                                        {order.Items.map(item => {
+                                                        {[...(order.Items || [])]
+                                                            .sort((a, b) => a.id - b.id)
+                                                            .map(item => {
                                                             const getRowStyle = () => {
                                                                 const baseStyle = {
                                                                     borderBottom: '1px solid rgba(255,255,255,0.05)',
