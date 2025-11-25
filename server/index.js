@@ -4,12 +4,42 @@ const cors = require('cors');
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
+const net = require('net');
 const { DataTypes } = require('sequelize');
 const { sequelize, OrderAssignments, Order, User, OrderItem } = require('./db');
 const { seedAdmin } = require('./utils/seedAdmin');
 
 const app = express();
-const PORT = process.env.PORT || 3003;
+const PREFERRED_PORT = Number(process.env.PORT) || 3003;
+
+const isPortAvailable = (port) => new Promise((resolve, reject) => {
+    const tester = net
+        .createServer()
+        .once('error', (err) => {
+            if (err.code === 'EADDRINUSE' || err.code === 'EACCES') {
+                resolve(false);
+            } else {
+                reject(err);
+            }
+        })
+        .once('listening', () => {
+            tester.close(() => resolve(true));
+        })
+        .listen(port, '0.0.0.0');
+});
+
+const findAvailablePort = async (preferredPort, attempts = 10) => {
+    for (let offset = 0; offset < attempts; offset++) {
+        const portToTry = preferredPort + offset;
+        const available = await isPortAvailable(portToTry);
+
+        if (available) {
+            return portToTry;
+        }
+    }
+
+    throw new Error(`No available ports found starting from ${preferredPort}`);
+};
 
 // Middleware
 app.use(cors({
@@ -109,16 +139,29 @@ app.use('/api/items', require('./routes/items'));
 // Export for routes to use
 module.exports = { app, sequelize };
 
-// Start HTTPS Server
-if (require.main === module) {
+const startServer = async () => {
     const httpsOptions = {
         key: fs.readFileSync(path.join(__dirname, 'certs', 'key.pem')),
         cert: fs.readFileSync(path.join(__dirname, 'certs', 'cert.pem'))
     };
 
-    https.createServer(httpsOptions, app).listen(PORT, '0.0.0.0', () => {
-        console.log(`HTTPS Server running on https://localhost:${PORT}`);
-        console.log(`Also accessible at https://10.10.10.110:${PORT}`);
+    const portToUse = await findAvailablePort(PREFERRED_PORT);
+
+    if (portToUse !== PREFERRED_PORT) {
+        console.warn(`Port ${PREFERRED_PORT} is in use. Switching to ${portToUse}.`);
+    }
+
+    https.createServer(httpsOptions, app).listen(portToUse, '0.0.0.0', () => {
+        console.log(`HTTPS Server running on https://localhost:${portToUse}`);
+        console.log(`Also accessible at https://10.10.10.110:${portToUse}`);
+    });
+};
+
+// Start HTTPS Server
+if (require.main === module) {
+    startServer().catch((error) => {
+        console.error('Failed to start server:', error);
+        process.exit(1);
     });
 }
 
