@@ -1,18 +1,22 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useOrder } from '../context/OrderContext';
 
 const AccounterDashboard = () => {
     const { orders, orderPagination, fetchOrders, updateOrderStatus } = useOrder();
+    const [filterStatus, setFilterStatus] = useState('all'); // 'all', 'completed', 'entered_erp'
 
-    React.useEffect(() => {
-        fetchOrders({ limit: orderPagination.limit, offset: orderPagination.offset });
-    }, [fetchOrders, orderPagination.limit, orderPagination.offset]);
+    useEffect(() => {
+        const statusParam = filterStatus === 'all' ? undefined : filterStatus;
+        fetchOrders({ limit: orderPagination.limit, offset: orderPagination.offset, status: statusParam });
+    }, [fetchOrders, orderPagination.limit, orderPagination.offset, filterStatus]);
 
     const completedOrders = orders;
 
     const handleEnterErp = async (orderId) => {
         await updateOrderStatus(orderId, 'entered_erp');
-        await fetchOrders({ limit: orderPagination.limit, offset: orderPagination.offset });
+        // After updating, re-fetch orders with the current filter and pagination
+        const statusParam = filterStatus === 'all' ? undefined : filterStatus;
+        await fetchOrders({ limit: orderPagination.limit, offset: orderPagination.offset, status: statusParam });
     };
 
     const limit = orderPagination.limit || 20;
@@ -22,7 +26,8 @@ const AccounterDashboard = () => {
 
     const handlePageChange = (page) => {
         const newPage = Math.min(Math.max(page, 1), totalPages);
-        fetchOrders({ limit, offset: (newPage - 1) * limit });
+        const statusParam = filterStatus === 'all' ? undefined : filterStatus;
+        fetchOrders({ limit, offset: (newPage - 1) * limit, status: statusParam });
     };
 
     const start = totalOrders === 0 ? 0 : (orderPagination.offset || 0) + 1;
@@ -30,10 +35,32 @@ const AccounterDashboard = () => {
 
     return (
         <div style={{ maxWidth: '900px', margin: '0 auto' }}>
-            <header style={{ marginBottom: '2rem' }}>
-                <h1>Accounter Dashboard</h1>
-                <p style={{ color: 'var(--text-muted)' }}>Review completed orders and mark them as entered to ERP.</p>
-            </header>
+            <div className="dashboard-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+                <div>
+                    <h1>Accounter Dashboard</h1>
+                    <p className="text-muted">Manage completed orders and ERP entry</p>
+                </div>
+                <div style={{ display: 'flex', gap: '1rem' }}>
+                    <button
+                        className={`btn ${filterStatus === 'all' ? 'btn-primary' : 'btn-secondary'}`}
+                        onClick={() => setFilterStatus('all')}
+                    >
+                        All
+                    </button>
+                    <button
+                        className={`btn ${filterStatus === 'completed' ? 'btn-primary' : 'btn-secondary'}`}
+                        onClick={() => setFilterStatus('completed')}
+                    >
+                        Completed
+                    </button>
+                    <button
+                        className={`btn ${filterStatus === 'entered_erp' ? 'btn-primary' : 'btn-secondary'}`}
+                        onClick={() => setFilterStatus('entered_erp')}
+                    >
+                        Entered to ERP
+                    </button>
+                </div>
+            </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', gap: '1rem', flexWrap: 'wrap' }}>
                 <div style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>

@@ -171,10 +171,18 @@ router.get('/', authenticateToken, async (req, res) => {
                 distinct: true
             });
         } else if (req.user.role === 'accounter') {
+            const allowedStatuses = ['completed', 'entered_erp'];
+            let statusFilter = { [Op.in]: allowedStatuses };
+
+            // If a specific status is requested and it's allowed, use it
+            if (where.status && allowedStatuses.includes(where.status)) {
+                statusFilter = where.status;
+            }
+
             const accounterWhere = {
                 ...where,
                 accounterId: req.user.id,
-                status: { [Op.in]: ['completed', 'entered_erp'] }
+                status: statusFilter
             };
 
             result = await Order.findAndCountAll({

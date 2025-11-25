@@ -19,6 +19,10 @@ export const OrderProvider = ({ children }) => {
       const offset = Math.max(Number.isFinite(options.offset) ? options.offset : 0, 0);
       const params = new URLSearchParams({ limit, offset });
 
+      if (options.status) {
+        params.append('status', options.status);
+      }
+
       const response = await fetch(`${API_BASE_URL}/api/orders?${params.toString()}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
