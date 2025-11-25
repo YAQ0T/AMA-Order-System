@@ -15,6 +15,34 @@ const getItemAttributesForRole = (role) => {
     return baseAttributes;
 };
 
+const buildOrderIncludes = (role, options = {}) => {
+    const { includeHistory = false, includeEmails = false, makerAttrs, assignedTakerAttrs, historyLimit } = options;
+
+    const makerAttributes = makerAttrs || (includeEmails ? ['id', 'username', 'role', 'email'] : ['id', 'username', 'role']);
+    const assignedAttributes = assignedTakerAttrs || (includeEmails ? ['id', 'username', 'email'] : ['id', 'username']);
+    const accounterAttributes = ['id', 'username', 'role'];
+
+    const includes = [
+        { association: Order.associations.Maker, attributes: makerAttributes },
+        { association: Order.associations.AssignedTakers, attributes: assignedAttributes, through: { attributes: [] } },
+        { association: Order.associations.Accounter, attributes: accounterAttributes },
+        { association: Order.associations.Items, attributes: getItemAttributesForRole(role) }
+    ];
+
+    if (includeHistory) {
+        includes.push({
+            association: Order.associations.History,
+            attributes: ['id', 'previousDescription', 'newDescription', 'createdAt', 'changedBy'],
+            include: [{ association: OrderLog.associations.Editor, attributes: ['id', 'username'] }],
+            separate: true,
+            limit: historyLimit,
+            order: [['createdAt', 'DESC']]
+        });
+    }
+
+    return includes;
+};
+
 // Create Order (Maker only)
 router.post('/', authenticateToken, async (req, res) => {
     try {
@@ -82,12 +110,10 @@ router.post('/', authenticateToken, async (req, res) => {
 
         // Fetch complete order with associations for response
         const completeOrder = await Order.findByPk(order.id, {
-            include: [
-                { model: User, as: 'Maker', attributes: ['id', 'username'] },
-                { model: User, as: 'AssignedTakers', attributes: ['id', 'username', 'email'] },
-                { model: User, as: 'Accounter', attributes: ['id', 'username', 'role'] },
-                { model: OrderItem, as: 'Items', attributes: getItemAttributesForRole(req.user.role) }
-            ]
+            include: buildOrderIncludes(req.user.role, {
+                includeEmails: true,
+                makerAttrs: ['id', 'username']
+            })
         });
 
         // Send email notifications to assigned takers
@@ -130,23 +156,7 @@ router.get('/', authenticateToken, async (req, res) => {
             ];
         }
 
-        const includeOptions = [
-            { model: User, as: 'Maker', attributes: ['id', 'username', 'role'] },
-            { model: User, as: 'AssignedTakers', attributes: ['id', 'username'], through: { attributes: [] } },
-            { model: User, as: 'Accounter', attributes: ['id', 'username', 'role'] },
-            { model: OrderItem, as: 'Items', attributes: getItemAttributesForRole(req.user.role) }
-        ];
-
-        if (includeHistory) {
-            includeOptions.push({
-                model: OrderLog,
-                as: 'History',
-                attributes: ['id', 'previousDescription', 'newDescription', 'createdAt', 'changedBy'],
-                include: [{ model: User, as: 'Editor', attributes: ['id', 'username'] }],
-                separate: true,
-                order: [['createdAt', 'DESC']]
-            });
-        }
+        const includeOptions = buildOrderIncludes(req.user.role, { includeHistory });
 
         let result;
 
@@ -262,11 +272,11 @@ router.put('/:id', authenticateToken, async (req, res) => {
         }
 
         const order = await Order.findByPk(req.params.id, {
-            include: [
-                { model: User, as: 'Maker', attributes: ['id', 'username', 'role'] },
-                { model: OrderItem, as: 'Items' },
-                { model: User, as: 'AssignedTakers', attributes: ['id', 'username'] }
-            ]
+            include: buildOrderIncludes(req.user.role, {
+                includeEmails: true,
+                makerAttrs: ['id', 'username', 'role'],
+                assignedTakerAttrs: ['id', 'username']
+            })
         });
 
         if (!order) {
@@ -299,12 +309,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
             await order.save();
 
             const updatedOrder = await Order.findByPk(order.id, {
-                include: [
-                    { model: User, as: 'Maker', attributes: ['id', 'username', 'role', 'email'] },
-                    { model: User, as: 'AssignedTakers', attributes: ['id', 'username', 'email'] },
-                    { model: User, as: 'Accounter', attributes: ['id', 'username', 'role'] },
-                    { model: OrderItem, as: 'Items', attributes: getItemAttributesForRole(req.user.role) }
-                ]
+                include: buildOrderIncludes(req.user.role, { includeEmails: true })
             });
 
             return res.json(updatedOrder);
@@ -553,19 +558,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
 
         // Reload to get full data including recent logs
         const updatedOrder = await Order.findByPk(order.id, {
-            include: [
-                { model: User, as: 'Maker', attributes: ['id', 'username', 'role', 'email'] },
-                { model: User, as: 'AssignedTakers', attributes: ['id', 'username', 'email'] },
-                { model: User, as: 'Accounter', attributes: ['id', 'username', 'role'] },
-                {
-                    model: OrderLog,
-                    as: 'History',
-                    include: [{ model: User, as: 'Editor', attributes: ['username'] }],
-                    limit: 5,
-                    order: [['createdAt', 'DESC']]
-                },
-                { model: OrderItem, as: 'Items', attributes: getItemAttributesForRole(req.user.role) }
-            ]
+            include: buildOrderIncludes(req.user.role, { includeHistory: true, includeEmails: true, historyLimit: 5 })
         });
 
         // Send email notifications (skip if this is part of bulk send)
@@ -668,10 +661,7 @@ router.post('/bulk-email', authenticateToken, async (req, res) => {
         // Fetch all orders with their items
         const orders = await Order.findAll({
             where: { id: orderIds },
-            include: [
-                { model: OrderItem, as: 'Items' },
-                { model: User, as: 'AssignedTakers', attributes: ['id', 'username', 'email'] }
-            ]
+            include: buildOrderIncludes(req.user.role, { includeEmails: true })
         });
 
         console.log(`Bulk email: Found ${orders.length} orders for ${orderIds.length} order IDs`);
