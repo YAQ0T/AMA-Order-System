@@ -125,27 +125,38 @@ const MakerDashboard = () => {
         setItems(items.filter((_, i) => i !== index));
     };
 
-    const handleItemChange = (index, field, value) => {
-        const newItems = [...items];
+    const findDuplicateProductName = (products) => {
+        const seenNames = new Map();
 
-        // Check for duplicate product names when changing the name field
-        if (field === 'name' && value.trim()) {
-            const isDuplicate = items.some((item, i) =>
-                i !== index && item.name.trim().toLowerCase() === value.trim().toLowerCase()
-            );
+        for (const product of products) {
+            const normalized = (product.name || '').trim().toLowerCase();
 
-            if (isDuplicate) {
-                alert('This product is already added to this order\nالمنتج الذي تحاول اضافته مضاف من قبل في نفس الطلب');
-                return; // Don't update if duplicate
+            if (!normalized) continue;
+
+            if (seenNames.has(normalized)) {
+                return seenNames.get(normalized) || product.name.trim();
             }
+
+            seenNames.set(normalized, (product.name || '').trim());
         }
 
+        return null;
+    };
+
+    const handleItemChange = (index, field, value) => {
+        const newItems = [...items];
         newItems[index][field] = value;
         setItems(newItems);
     };
 
     const handleSubmit = async (e, isArchived = false) => {
         e.preventDefault();
+
+        const duplicateProduct = findDuplicateProductName(items);
+        if (duplicateProduct) {
+            alert(`Duplicate product name found: ${duplicateProduct}\nاسم المنتج مكرر: ${duplicateProduct}`);
+            return;
+        }
 
         const validTakers = selectedTakers.map(id => Number(id)).filter(id => id > 0);
 
@@ -175,6 +186,12 @@ const MakerDashboard = () => {
     };
 
     const handleUpdate = async (orderId) => {
+        const duplicateProduct = findDuplicateProductName(editItems);
+        if (duplicateProduct) {
+            alert(`Duplicate product name found: ${duplicateProduct}\nاسم المنتج مكرر: ${duplicateProduct}`);
+            return;
+        }
+
         const success = await updateOrderDetails(orderId, {
             title: editTitle,
             city: editCity,
