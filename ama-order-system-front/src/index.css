@@ -98,6 +98,16 @@ button {
   border-color: var(--primary);
 }
 
+/* Taker Dashboard tweaks */
+.taker-dashboard .order-controls select {
+  min-width: 160px;
+}
+
+.taker-dashboard .status-action-btn {
+  min-width: 44px;
+  justify-content: center;
+}
+
 .container {
   max-width: 1200px;
   margin: 0 auto;
@@ -187,6 +197,48 @@ button {
 
   .order-items-table .item-qty {
     color: var(--text-muted);
+  }
+
+  .taker-dashboard .order-controls {
+    width: 100%;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .taker-dashboard .order-controls select {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.9rem;
+  }
+
+  .taker-dashboard .order-controls button {
+    padding: 0.35rem 0.6rem;
+    font-size: 0.8rem;
+  }
+
+  .taker-dashboard .status-actions {
+    width: 100%;
+    justify-content: flex-start;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+  }
+
+  .taker-dashboard .status-action-btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.8rem;
+  }
+
+  .taker-dashboard .order-items-table tr {
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .taker-dashboard .order-items-table .item-name {
+    font-size: 0.95rem;
+  }
+
+  .taker-dashboard .order-items-table .item-qty {
+    font-size: 0.9rem;
   }
 
   .order-header {

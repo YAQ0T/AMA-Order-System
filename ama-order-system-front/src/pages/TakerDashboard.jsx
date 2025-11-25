@@ -94,7 +94,7 @@ const TakerDashboard = () => {
     };
 
     return (
-        <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
+        <div className="taker-dashboard" style={{ maxWidth: '1000px', margin: '0 auto' }}>
             <header style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                     <h1>My Assigned Orders</h1>
@@ -171,7 +171,7 @@ const TakerDashboard = () => {
                                             </span>
                                         )}
                                     </div>
-                                    <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                                    <div className="order-controls" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                                         <select
                                             value={order.status}
                                             onChange={(e) => handleStatusChange(order.id, e.target.value)}
@@ -299,10 +299,10 @@ const TakerDashboard = () => {
                                                                         opacity: item.status === 'unavailable' ? 0.6 : 1
                                                                     }}>{item.quantity}</td>
                                                                     <td style={{ padding: '0.5rem', textAlign: 'center' }}>
-                                                                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                                                                        <div className="status-actions" style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
                                                                             <button
                                                                                 onClick={() => handleItemStatusChange(item.id, item.status === 'collected' ? null : 'collected')}
-                                                                                className="btn-secondary"
+                                                                                className="btn-secondary status-action-btn"
                                                                                 style={{
                                                                                     padding: '0.3rem 0.6rem',
                                                                                     fontSize: '0.9rem',
@@ -316,7 +316,7 @@ const TakerDashboard = () => {
                                                                             </button>
                                                                             <button
                                                                                 onClick={() => handleItemStatusChange(item.id, item.status === 'unavailable' ? null : 'unavailable')}
-                                                                                className="btn-secondary"
+                                                                                className="btn-secondary status-action-btn"
                                                                                 style={{
                                                                                     padding: '0.3rem 0.6rem',
                                                                                     fontSize: '0.9rem',
