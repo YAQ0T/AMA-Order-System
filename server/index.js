@@ -4,6 +4,7 @@ const cors = require('cors');
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
+const { DataTypes } = require('sequelize');
 const { sequelize, OrderAssignments, Order, User, OrderItem } = require('./db');
 const { seedAdmin } = require('./utils/seedAdmin');
 
@@ -39,36 +40,59 @@ app.use(cors({
 app.use(express.json());
 
 // Sync Database and seed admin
-sequelize.sync().then(async () => {
-    // Alter Order table to allow null description
+const syncDatabase = async () => {
     try {
-        await Order.sync({ alter: true });
-        console.log('Order table altered');
-    } catch (err) {
-        console.error('Error altering Order table:', err);
-    }
+        const queryInterface = sequelize.getQueryInterface();
+        const orderTable = await queryInterface.describeTable('Orders');
 
-    // Alter User table to add email column
-    try {
-        await User.sync({ alter: true });
-        console.log('User table altered - email column added');
-    } catch (err) {
-        console.error('Error altering User table:', err);
-    }
+        if (!orderTable.accounterId) {
+            await queryInterface.addColumn('Orders', 'accounterId', {
+                type: DataTypes.INTEGER,
+                allowNull: true,
+                references: {
+                    model: 'Users',
+                    key: 'id'
+                },
+                onUpdate: 'CASCADE',
+                onDelete: 'SET NULL'
+            });
+            console.log('Added accounterId column to Orders table');
+        }
 
-    // Alter OrderItem table to add status column
-    try {
-        await OrderItem.sync({ alter: true });
-        console.log('OrderItem table altered - status column added');
-    } catch (err) {
-        console.error('Error altering OrderItem table:', err);
-    }
+        await sequelize.sync();
 
-    console.log('Database synced');
-    await seedAdmin();
-}).catch((error) => {
-    console.error('Failed to sync database:', error);
-});
+        // Alter Order table to allow null description
+        try {
+            await Order.sync({ alter: true });
+            console.log('Order table altered');
+        } catch (err) {
+            console.error('Error altering Order table:', err);
+        }
+
+        // Alter User table to add email column
+        try {
+            await User.sync({ alter: true });
+            console.log('User table altered - email column added');
+        } catch (err) {
+            console.error('Error altering User table:', err);
+        }
+
+        // Alter OrderItem table to add status column
+        try {
+            await OrderItem.sync({ alter: true });
+            console.log('OrderItem table altered - status column added');
+        } catch (err) {
+            console.error('Error altering OrderItem table:', err);
+        }
+
+        console.log('Database synced');
+        await seedAdmin();
+    } catch (error) {
+        console.error('Failed to sync database:', error);
+    }
+};
+
+syncDatabase();
 
 // Routes
 const authRoutes = require('./routes/auth');
