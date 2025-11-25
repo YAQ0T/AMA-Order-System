@@ -78,6 +78,7 @@ const MakerDashboard = () => {
     const [bulkSendCity, setBulkSendCity] = useState(null); // City currently being bulk sent
     const [showBulkSendModal, setShowBulkSendModal] = useState(false);
     const [bulkSendTakers, setBulkSendTakers] = useState([]);
+    const [bulkSendAccounter, setBulkSendAccounter] = useState(null);
 
     // Product & Title Suggestions
     const [productSuggestions, setProductSuggestions] = useState([]);
@@ -289,6 +290,7 @@ const MakerDashboard = () => {
     const initiateBulkSend = (city) => {
         setBulkSendCity(city);
         setBulkSendTakers([]);
+        setBulkSendAccounter(null);
         setShowBulkSendModal(true);
     };
 
@@ -299,9 +301,27 @@ const MakerDashboard = () => {
         );
     };
 
+    const toggleBulkAccounter = (accounterId) => {
+        const id = Number(accounterId);
+        setBulkSendAccounter(prev => prev === id ? null : id);
+    };
+
+    const resetBulkSendState = () => {
+        setShowBulkSendModal(false);
+        setBulkSendCity(null);
+        setBulkSendTakers([]);
+        setBulkSendAccounter(null);
+    };
+
     const confirmBulkSend = async () => {
         if (bulkSendTakers.length === 0) {
             alert('Please select at least one taker.');
+            return;
+        }
+
+        const availableAccounters = users.filter(u => u.role === 'accounter');
+        if (availableAccounters.length > 0 && !bulkSendAccounter) {
+            alert('Please select an accounter to handle these orders.');
             return;
         }
 
@@ -315,7 +335,8 @@ const MakerDashboard = () => {
             const success = await updateOrderDetails(order.id, {
                 status: 'pending',
                 assignedTakerIds: bulkSendTakers,
-                skipEmail: true // Avoid sending separate emails per order during bulk send
+                skipEmail: true, // Avoid sending separate emails per order during bulk send
+                accounterId: bulkSendAccounter || null
             });
 
             if (success) {
@@ -342,10 +363,8 @@ const MakerDashboard = () => {
             }
         }
 
-        setShowBulkSendModal(false);
-        setBulkSendCity(null);
-        setBulkSendTakers([]);
         setSelectedArchivedOrders(prev => prev.filter(id => !ordersToSend.map(o => o.id).includes(id)));
+        resetBulkSendState();
         alert(`Sent ${ordersToSend.length} orders to takers!`);
     };
 
@@ -1189,8 +1208,28 @@ const MakerDashboard = () => {
                                 </div>
                             </div>
 
+                            <div style={{ marginBottom: '1.5rem' }}>
+                                <label style={{ display: 'block', marginBottom: '0.5rem' }}>Select Accounter</label>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                                    {users.filter(u => u.role === 'accounter').map(accounter => (
+                                        <button
+                                            key={accounter.id}
+                                            type="button"
+                                            className={`btn-secondary ${bulkSendAccounter === accounter.id ? 'active' : ''}`}
+                                            onClick={() => toggleBulkAccounter(accounter.id)}
+                                            style={{ borderColor: bulkSendAccounter === accounter.id ? 'var(--primary)' : undefined }}
+                                        >
+                                            {accounter.username}
+                                        </button>
+                                    ))}
+                                    {users.filter(u => u.role === 'accounter').length === 0 && (
+                                        <p style={{ color: 'var(--text-muted)' }}>No accounters available.</p>
+                                    )}
+                                </div>
+                            </div>
+
                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
-                                <button className="btn-secondary" onClick={() => setShowBulkSendModal(false)}>Cancel</button>
+                                <button className="btn-secondary" onClick={resetBulkSendState}>Cancel</button>
                                 <button className="btn-primary" onClick={confirmBulkSend}>Confirm & Send</button>
                             </div>
                         </div>
