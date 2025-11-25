@@ -102,6 +102,7 @@ const AccounterDashboard = () => {
                                         <thead>
                                             <tr style={{ borderBottom: '1px solid var(--glass-border)', textAlign: 'left' }}>
                                                 <th style={{ padding: '0.5rem', color: 'var(--text-muted)' }}>Product</th>
+                                                <th style={{ padding: '0.5rem', color: 'var(--text-muted)', textAlign: 'center' }}>Status</th>
                                                 <th style={{ padding: '0.5rem', color: 'var(--text-muted)', textAlign: 'right' }}>Qty</th>
                                                 <th style={{ padding: '0.5rem', color: 'var(--text-muted)', textAlign: 'right' }}>Price</th>
                                             </tr>
@@ -110,6 +111,15 @@ const AccounterDashboard = () => {
                                             {order.Items.map(item => (
                                                 <tr key={item.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                                                     <td style={{ padding: '0.5rem' }}>{item.name}</td>
+                                                    <td style={{ padding: '0.5rem', textAlign: 'center' }}>
+                                                        {item.status === 'collected' ? (
+                                                            <span style={{ color: '#34d399', fontSize: '1.2rem' }}>✓</span>
+                                                        ) : item.status === 'unavailable' ? (
+                                                            <span style={{ color: '#ef4444', fontSize: '1.2rem' }}>✕</span>
+                                                        ) : (
+                                                            <span style={{ color: 'var(--text-muted)' }}>-</span>
+                                                        )}
+                                                    </td>
                                                     <td style={{ padding: '0.5rem', textAlign: 'right' }}>{item.quantity}</td>
                                                     <td style={{ padding: '0.5rem', textAlign: 'right' }}>{item.price ? `${item.price} ₪` : '-'}</td>
                                                 </tr>

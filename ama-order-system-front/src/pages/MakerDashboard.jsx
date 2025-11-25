@@ -47,6 +47,10 @@ const MakerDashboard = () => {
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [orderToDelete, setOrderToDelete] = useState(null);
 
+    // ERP Confirmation Modal State
+    const [showErpModal, setShowErpModal] = useState(false);
+    const [orderToErp, setOrderToErp] = useState(null);
+
     const handleDeleteClick = (order) => {
         setOrderToDelete(order);
         setShowDeleteModal(true);
@@ -57,6 +61,20 @@ const MakerDashboard = () => {
             await deleteOrder(orderToDelete.id);
             setShowDeleteModal(false);
             setOrderToDelete(null);
+        }
+    };
+
+    const handleErpClick = (order) => {
+        setOrderToErp(order);
+        setShowErpModal(true);
+    };
+
+    const confirmErp = async () => {
+        if (orderToErp) {
+            await updateOrderStatus(orderToErp.id, 'entered_erp');
+            setShowErpModal(false);
+            setOrderToErp(null);
+            fetchOrders({ limit: orderPagination.limit, offset: orderPagination.offset });
         }
     };
 
@@ -771,30 +789,30 @@ const MakerDashboard = () => {
                                                                         onChange={(e) => handleEditItemChange(index, 'name', e.target.value)}
                                                                         style={{ flex: 2 }}
                                                                     />
-                                                                <input
-                                                                    type="number"
-                                                                    className="input-field"
-                                                                    placeholder="Qty"
-                                                                    value={item.quantity}
-                                                                    onChange={(e) => handleEditItemChange(index, 'quantity', parseInt(e.target.value))}
-                                                                    min="1"
-                                                                    style={{ flex: 0.5 }}
-                                                                />
-                                                                <input
-                                                                    type="number"
-                                                                    className="input-field"
-                                                                    placeholder="Price (optional)"
-                                                                    value={item.price}
-                                                                    onChange={(e) => handleEditItemChange(index, 'price', e.target.value === '' ? '' : parseFloat(e.target.value))}
-                                                                    min="0"
-                                                                    step="0.01"
-                                                                    style={{ flex: 0.8 }}
-                                                                />
-                                                                <button type="button" onClick={() => handleEditRemoveItem(index)} className="btn-secondary" style={{ color: '#ef4444', borderColor: '#ef4444' }}>
-                                                                    ✕
-                                                                </button>
-                                                            </div>
-                                                        ))}
+                                                                    <input
+                                                                        type="number"
+                                                                        className="input-field"
+                                                                        placeholder="Qty"
+                                                                        value={item.quantity}
+                                                                        onChange={(e) => handleEditItemChange(index, 'quantity', parseInt(e.target.value))}
+                                                                        min="1"
+                                                                        style={{ flex: 0.5 }}
+                                                                    />
+                                                                    <input
+                                                                        type="number"
+                                                                        className="input-field"
+                                                                        placeholder="Price (optional)"
+                                                                        value={item.price}
+                                                                        onChange={(e) => handleEditItemChange(index, 'price', e.target.value === '' ? '' : parseFloat(e.target.value))}
+                                                                        min="0"
+                                                                        step="0.01"
+                                                                        style={{ flex: 0.8 }}
+                                                                    />
+                                                                    <button type="button" onClick={() => handleEditRemoveItem(index)} className="btn-secondary" style={{ color: '#ef4444', borderColor: '#ef4444' }}>
+                                                                        ✕
+                                                                    </button>
+                                                                </div>
+                                                            ))}
                                                             <button type="button" onClick={handleEditAddItem} className="btn-secondary" style={{ alignSelf: 'flex-start', marginTop: '0.5rem' }}>
                                                                 + Add Item
                                                             </button>
@@ -924,6 +942,16 @@ const MakerDashboard = () => {
                                                 <button onClick={() => startEditing(order)} className="btn-secondary" style={{ padding: '0.2rem 0.5rem', fontSize: '0.8rem' }}>
                                                     Edit
                                                 </button>
+                                                {order.status === 'completed' && (
+                                                    <button
+                                                        onClick={() => handleErpClick(order)}
+                                                        className="btn-primary"
+                                                        style={{ padding: '0.3rem 0.8rem', fontSize: '0.8rem', background: '#8b5cf6', borderColor: '#8b5cf6' }}
+                                                        title="Mark as Entered to ERP"
+                                                    >
+                                                        🧾 To ERP
+                                                    </button>
+                                                )}
                                                 <button
                                                     onClick={() => {
                                                         if (window.confirm('Are you sure you want to delete this order? This action cannot be undone.')) {
@@ -1235,13 +1263,22 @@ const MakerDashboard = () => {
                         </div>
                     </div>
                 )}
+                {/* ERP Confirmation Modal */}
+                <ConfirmModal
+                    isOpen={showErpModal}
+                    onClose={() => setShowErpModal(false)}
+                    onConfirm={confirmErp}
+                    title="Mark as Entered to ERP"
+                    message={`Are you sure you want to mark order #${orderToErp?.id} as Entered to ERP? This action cannot be undone easily.`}
+                />
+
                 {/* Delete Confirmation Modal */}
                 <ConfirmModal
                     isOpen={showDeleteModal}
                     onClose={() => setShowDeleteModal(false)}
                     onConfirm={confirmDelete}
                     title="Delete Order"
-                    message="Are you sure you want to delete this order? This action cannot be undone."
+                    message={`Are you sure you want to delete order #${orderToDelete?.id}? This action cannot be undone.`}
                 />
             </div>
         </div>

@@ -26,7 +26,7 @@ const buildOrderIncludes = (role, options = {}) => {
         { association: Order.associations.Maker, attributes: makerAttributes },
         { association: Order.associations.AssignedTakers, attributes: assignedAttributes, through: { attributes: [] } },
         { association: Order.associations.Accounter, attributes: accounterAttributes },
-        { association: Order.associations.Items, attributes: getItemAttributesForRole(role) }
+        { association: Order.associations.Items, attributes: getItemAttributesForRole(role), separate: true, order: [['id', 'ASC']] }
     ];
 
     if (includeHistory) {
@@ -476,9 +476,9 @@ router.put('/:id', authenticateToken, async (req, res) => {
 
         // Handle Status Update
         if (status) {
-            // Validate entered_erp status can only be set by accounters or admins
-            if (status === 'entered_erp' && !['accounter', 'admin'].includes(req.user.role)) {
-                return res.status(403).json({ error: 'Only accounters can set status to "Entered into ERP"' });
+            // Validate entered_erp status can only be set by accounters, admins, or makers
+            if (status === 'entered_erp' && !['accounter', 'admin', 'maker'].includes(req.user.role)) {
+                return res.status(403).json({ error: 'Only accounters, makers, or admins can set status to "Entered into ERP"' });
             }
 
             const oldStatus = order.status;
