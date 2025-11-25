@@ -270,75 +270,76 @@ const TakerDashboard = () => {
                                                         {[...(order.Items || [])]
                                                             .sort((a, b) => a.id - b.id)
                                                             .map(item => {
-                                                            const getRowStyle = () => {
-                                                                const baseStyle = {
-                                                                    borderBottom: '1px solid rgba(255,255,255,0.05)',
-                                                                    transition: 'background-color 0.3s ease'
+                                                                const getRowStyle = () => {
+                                                                    const baseStyle = {
+                                                                        borderBottom: '1px solid rgba(255,255,255,0.05)',
+                                                                        transition: 'background-color 0.3s ease',
+                                                                        borderLeft: '3px solid transparent'
+                                                                    };
+
+                                                                    if (item.status === 'collected') {
+                                                                        return {
+                                                                            ...baseStyle,
+                                                                            backgroundColor: 'rgba(52, 211, 153, 0.15)',
+                                                                            borderLeft: '3px solid #34d399'
+                                                                        };
+                                                                    } else if (item.status === 'unavailable') {
+                                                                        return {
+                                                                            ...baseStyle,
+                                                                            backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                                                                            borderLeft: '3px solid #ef4444'
+                                                                        };
+                                                                    }
+                                                                    return baseStyle;
                                                                 };
 
-                                                                if (item.status === 'collected') {
-                                                                    return {
-                                                                        ...baseStyle,
-                                                                        backgroundColor: 'rgba(52, 211, 153, 0.15)',
-                                                                        borderLeft: '3px solid #34d399'
-                                                                    };
-                                                                } else if (item.status === 'unavailable') {
-                                                                    return {
-                                                                        ...baseStyle,
-                                                                        backgroundColor: 'rgba(239, 68, 68, 0.15)',
-                                                                        borderLeft: '3px solid #ef4444'
-                                                                    };
-                                                                }
-                                                                return baseStyle;
-                                                            };
-
-                                                            return (
-                                                                <tr key={item.id} style={getRowStyle()}>
-                                                                    <td className="item-name" style={{
-                                                                        padding: '0.5rem',
-                                                                        textDecoration: item.status === 'unavailable' ? 'line-through' : 'none',
-                                                                        opacity: item.status === 'unavailable' ? 0.6 : 1
-                                                                    }}>{item.name}</td>
-                                                                    <td className="item-qty" style={{
-                                                                        padding: '0.5rem',
-                                                                        textAlign: 'right',
-                                                                        opacity: item.status === 'unavailable' ? 0.6 : 1
-                                                                    }}>{item.quantity}</td>
-                                                                    <td style={{ padding: '0.5rem', textAlign: 'center' }}>
-                                                                        <div className="status-actions" style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
-                                                                            <button
-                                                                                onClick={() => handleItemStatusChange(item.id, item.status === 'collected' ? null : 'collected')}
-                                                                                className="btn-secondary status-action-btn"
-                                                                                style={{
-                                                                                    padding: '0.3rem 0.6rem',
-                                                                                    fontSize: '0.9rem',
-                                                                                    background: item.status === 'collected' ? '#34d399' : 'transparent',
-                                                                                    borderColor: item.status === 'collected' ? '#34d399' : 'var(--glass-border)',
-                                                                                    color: item.status === 'collected' ? '#000' : 'var(--text-main)'
-                                                                                }}
-                                                                                title="Mark as collected"
-                                                                            >
-                                                                                ✓
-                                                                            </button>
-                                                                            <button
-                                                                                onClick={() => handleItemStatusChange(item.id, item.status === 'unavailable' ? null : 'unavailable')}
-                                                                                className="btn-secondary status-action-btn"
-                                                                                style={{
-                                                                                    padding: '0.3rem 0.6rem',
-                                                                                    fontSize: '0.9rem',
-                                                                                    background: item.status === 'unavailable' ? '#ef4444' : 'transparent',
-                                                                                    borderColor: item.status === 'unavailable' ? '#ef4444' : 'var(--glass-border)',
-                                                                                    color: item.status === 'unavailable' ? '#fff' : 'var(--text-main)'
-                                                                                }}
-                                                                                title="Mark as unavailable"
-                                                                            >
-                                                                                ✕
-                                                                            </button>
-                                                                        </div>
-                                                                    </td>
-                                                                </tr>
-                                                            );
-                                                        })}
+                                                                return (
+                                                                    <tr key={item.id} style={getRowStyle()}>
+                                                                        <td className="item-name" style={{
+                                                                            padding: '0.5rem',
+                                                                            textDecoration: item.status === 'unavailable' ? 'line-through' : 'none',
+                                                                            opacity: item.status === 'unavailable' ? 0.6 : 1
+                                                                        }}>{item.name}</td>
+                                                                        <td className="item-qty" style={{
+                                                                            padding: '0.5rem',
+                                                                            textAlign: 'right',
+                                                                            opacity: item.status === 'unavailable' ? 0.6 : 1
+                                                                        }}>{item.quantity}</td>
+                                                                        <td style={{ padding: '0.5rem', textAlign: 'center' }}>
+                                                                            <div className="status-actions" style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                                                                                <button
+                                                                                    onClick={() => handleItemStatusChange(item.id, item.status === 'collected' ? null : 'collected')}
+                                                                                    className="btn-secondary status-action-btn"
+                                                                                    style={{
+                                                                                        padding: '0.3rem 0.6rem',
+                                                                                        fontSize: '0.9rem',
+                                                                                        background: item.status === 'collected' ? '#34d399' : 'transparent',
+                                                                                        borderColor: item.status === 'collected' ? '#34d399' : 'var(--glass-border)',
+                                                                                        color: item.status === 'collected' ? '#000' : 'var(--text-main)'
+                                                                                    }}
+                                                                                    title="Mark as collected"
+                                                                                >
+                                                                                    ✓
+                                                                                </button>
+                                                                                <button
+                                                                                    onClick={() => handleItemStatusChange(item.id, item.status === 'unavailable' ? null : 'unavailable')}
+                                                                                    className="btn-secondary status-action-btn"
+                                                                                    style={{
+                                                                                        padding: '0.3rem 0.6rem',
+                                                                                        fontSize: '0.9rem',
+                                                                                        background: item.status === 'unavailable' ? '#ef4444' : 'transparent',
+                                                                                        borderColor: item.status === 'unavailable' ? '#ef4444' : 'var(--glass-border)',
+                                                                                        color: item.status === 'unavailable' ? '#fff' : 'var(--text-main)'
+                                                                                    }}
+                                                                                    title="Mark as unavailable"
+                                                                                >
+                                                                                    ✕
+                                                                                </button>
+                                                                            </div>
+                                                                        </td>
+                                                                    </tr>
+                                                                );
+                                                            })}
                                                     </tbody>
                                                 </table>
                                             ) : (
