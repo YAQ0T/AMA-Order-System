@@ -90,7 +90,7 @@ router.post('/', authenticateToken, async (req, res) => {
 // Get Orders (For current user)
 router.get('/', authenticateToken, async (req, res) => {
     try {
-        const limit = Math.min(parseInt(req.query.limit, 10) || 20, 100);
+        const limit = Math.min(parseInt(req.query.limit, 10) || 20, 20);
         const offset = parseInt(req.query.offset, 10) || 0;
         const includeHistory = req.query.includeHistory !== 'false';
         const search = (req.query.search || '').trim();
@@ -174,11 +174,25 @@ router.get('/', authenticateToken, async (req, res) => {
                 });
             }
 
+            const takerWhere = {
+                ...where,
+                id: { [Op.in]: orderIds }
+            };
+
+            // Always hide ERP-entered orders from takers
+            const andConditions = [{ status: { [Op.ne]: 'entered_erp' } }];
+
+            if (takerWhere.status) {
+                andConditions.push({ status: takerWhere.status });
+                delete takerWhere.status;
+            }
+
+            if (andConditions.length > 0) {
+                takerWhere[Op.and] = (takerWhere[Op.and] || []).concat(andConditions);
+            }
+
             result = await Order.findAndCountAll({
-                where: {
-                    ...where,
-                    id: { [Op.in]: orderIds }
-                },
+                where: takerWhere,
                 include: includeOptions,
                 order: [['createdAt', 'DESC']],
                 limit,
@@ -378,6 +392,9 @@ router.put('/:id', authenticateToken, async (req, res) => {
 
             // If changing from 'archived' to 'pending' (Sending the order), notify takers
             if (oldStatus === 'archived' && status === 'pending') {
+                // Refresh the sent timestamp when an archived order is re-sent
+                order.createdAt = new Date();
+
                 const currentTakers = await order.getAssignedTakers();
                 if (currentTakers.length > 0) {
                     await Notification.bulkCreate(

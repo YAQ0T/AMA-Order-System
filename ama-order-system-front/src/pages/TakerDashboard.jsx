@@ -20,8 +20,9 @@ const TakerDashboard = () => {
         setTimeout(() => setIsRefreshing(false), 500);
     };
 
-    // Filter out completed orders
-    const activeOrders = orders.filter(order => order.status !== 'completed');
+    // Hide ERP-entered orders and filter out completed entries
+    const visibleOrders = orders.filter(order => order.status !== 'entered_erp');
+    const activeOrders = visibleOrders.filter(order => order.status !== 'completed');
 
     // Edit State
     const [editingOrderId, setEditingOrderId] = useState(null);
@@ -30,6 +31,18 @@ const TakerDashboard = () => {
 
     const handleStatusChange = (orderId, newStatus) => {
         updateOrderStatus(orderId, newStatus);
+    };
+
+    const limit = orderPagination.limit || 20;
+    const totalOrders = orderPagination.total || visibleOrders.length;
+    const totalPages = Math.max(1, Math.ceil(totalOrders / limit));
+    const currentPage = Math.min(Math.floor((orderPagination.offset || 0) / limit) + 1, totalPages);
+    const pageStart = totalOrders === 0 ? 0 : (currentPage - 1) * limit + 1;
+    const pageEnd = Math.min(totalOrders, currentPage * limit);
+
+    const handlePageChange = (page) => {
+        const newPage = Math.min(Math.max(page, 1), totalPages);
+        fetchOrders({ limit, offset: (newPage - 1) * limit });
     };
 
     // Item Status Handlers
@@ -101,6 +114,33 @@ const TakerDashboard = () => {
                     {isRefreshing ? 'Refreshing...' : 'Refresh'}
                 </button>
             </header>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', gap: '1rem', flexWrap: 'wrap' }}>
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>
+                    Showing {pageStart}-{pageEnd} of {totalOrders} orders
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <button
+                        className="btn-secondary"
+                        style={{ padding: '0.35rem 0.75rem', fontSize: '0.9rem', opacity: currentPage === 1 ? 0.6 : 1 }}
+                        onClick={() => handlePageChange(currentPage - 1)}
+                        disabled={currentPage === 1}
+                    >
+                        Previous
+                    </button>
+                    <span style={{ color: 'var(--text-muted)', minWidth: '90px', textAlign: 'center', fontSize: '0.95rem' }}>
+                        Page {currentPage} / {totalPages}
+                    </span>
+                    <button
+                        className="btn-secondary"
+                        style={{ padding: '0.35rem 0.75rem', fontSize: '0.9rem', opacity: currentPage === totalPages ? 0.6 : 1 }}
+                        onClick={() => handlePageChange(currentPage + 1)}
+                        disabled={currentPage === totalPages}
+                    >
+                        Next
+                    </button>
+                </div>
+            </div>
 
             <div style={{ display: 'grid', gap: '1.5rem' }}>
                 {activeOrders.length === 0 ? (
