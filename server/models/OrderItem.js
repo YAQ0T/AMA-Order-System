@@ -10,6 +10,11 @@ module.exports = (sequelize) => {
             type: DataTypes.INTEGER,
             allowNull: false,
             defaultValue: 1
+        },
+        status: {
+            type: DataTypes.ENUM('collected', 'unavailable'),
+            allowNull: true,
+            defaultValue: null
         }
     });
 

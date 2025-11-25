@@ -35,4 +35,28 @@ router.get('/suggestions', async (req, res) => {
     }
 });
 
+// PATCH /api/items/:itemId/status
+router.patch('/:itemId/status', async (req, res) => {
+    try {
+        const { itemId } = req.params;
+        const { status } = req.body;
+
+        // Validate status value
+        if (status !== null && status !== 'collected' && status !== 'unavailable') {
+            return res.status(400).json({ error: 'Invalid status value. Must be null, "collected", or "unavailable"' });
+        }
+
+        const item = await OrderItem.findByPk(itemId);
+        if (!item) {
+            return res.status(404).json({ error: 'Item not found' });
+        }
+
+        await item.update({ status });
+        res.json(item);
+    } catch (error) {
+        console.error('Error updating item status:', error);
+        res.status(500).json({ error: 'Failed to update item status' });
+    }
+});
+
 module.exports = router;

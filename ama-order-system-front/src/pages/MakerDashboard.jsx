@@ -33,7 +33,7 @@ const ConfirmModal = ({ isOpen, onClose, onConfirm, title, message }) => {
 };
 
 const MakerDashboard = () => {
-    const { users, createOrder, orders, updateOrderDetails, deleteOrder } = useOrder();
+    const { users, createOrder, orders, updateOrderDetails, deleteOrder, updateOrderStatus } = useOrder();
     const { token } = useAuth();
     const [title, setTitle] = useState('');
     const [note, setNote] = useState('');
@@ -127,6 +127,19 @@ const MakerDashboard = () => {
 
     const handleItemChange = (index, field, value) => {
         const newItems = [...items];
+
+        // Check for duplicate product names when changing the name field
+        if (field === 'name' && value.trim()) {
+            const isDuplicate = items.some((item, i) =>
+                i !== index && item.name.trim().toLowerCase() === value.trim().toLowerCase()
+            );
+
+            if (isDuplicate) {
+                alert('This product is already added to this order\nالمنتج الذي تحاول اضافته مضاف من قبل في نفس الطلب');
+                return; // Don't update if duplicate
+            }
+        }
+
         newItems[index][field] = value;
         setItems(newItems);
     };
@@ -684,12 +697,35 @@ const MakerDashboard = () => {
                                         )}
                                     </div>
                                     <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                                        <span style={{
-                                            color: order.status === 'completed' ? '#34d399' : order.status === 'in-progress' ? '#fbbf24' : '#94a3b8',
-                                            textTransform: 'capitalize'
-                                        }}>
-                                            {order.status}
-                                        </span>
+                                        {editingOrderId !== order.id ? (
+                                            <span style={{
+                                                color: order.status === 'completed' ? '#34d399' :
+                                                    order.status === 'in-progress' ? '#fbbf24' :
+                                                        order.status === 'entered_erp' ? '#8b5cf6' : '#94a3b8',
+                                                textTransform: 'capitalize'
+                                            }}>
+                                                {order.status === 'entered_erp' ? 'Entered into ERP' : order.status}
+                                            </span>
+                                        ) : (
+                                            <select
+                                                value={order.status}
+                                                onChange={(e) => updateOrderStatus(order.id, e.target.value)}
+                                                style={{
+                                                    padding: '0.3rem 0.5rem',
+                                                    borderRadius: '4px',
+                                                    border: '1px solid var(--glass-border)',
+                                                    background: 'var(--glass-bg)',
+                                                    color: 'var(--text-main)',
+                                                    fontSize: '0.9rem'
+                                                }}
+                                            >
+                                                <option value="pending">Pending</option>
+                                                <option value="in-progress">In Progress</option>
+                                                <option value="completed">Completed</option>
+                                                <option value="entered_erp">Entered into ERP</option>
+                                                <option value="archived">Archived</option>
+                                            </select>
+                                        )}
                                         <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
                                             {new Date(order.createdAt).toLocaleDateString()}
                                         </span>
@@ -788,15 +824,59 @@ const MakerDashboard = () => {
                                                         <tr style={{ borderBottom: '1px solid var(--glass-border)', textAlign: 'left' }}>
                                                             <th style={{ padding: '0.5rem', color: 'var(--text-muted)' }}>Product</th>
                                                             <th style={{ padding: '0.5rem', color: 'var(--text-muted)', textAlign: 'right' }}>Qty</th>
+                                                            <th style={{ padding: '0.5rem', color: 'var(--text-muted)', textAlign: 'center' }}>Status</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
-                                                        {order.Items.map(item => (
-                                                            <tr key={item.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                                                                <td className="item-name" style={{ padding: '0.5rem' }}>{item.name}</td>
-                                                                <td className="item-qty" style={{ padding: '0.5rem', textAlign: 'right' }}>{item.quantity}</td>
-                                                            </tr>
-                                                        ))}
+                                                        {order.Items.map(item => {
+                                                            const getRowStyle = () => {
+                                                                const baseStyle = {
+                                                                    borderBottom: '1px solid rgba(255,255,255,0.05)',
+                                                                    transition: 'background-color 0.3s ease'
+                                                                };
+
+                                                                if (item.status === 'collected') {
+                                                                    return {
+                                                                        ...baseStyle,
+                                                                        backgroundColor: 'rgba(52, 211, 153, 0.15)',
+                                                                        borderLeft: '3px solid #34d399'
+                                                                    };
+                                                                } else if (item.status === 'unavailable') {
+                                                                    return {
+                                                                        ...baseStyle,
+                                                                        backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                                                                        borderLeft: '3px solid #ef4444'
+                                                                    };
+                                                                }
+                                                                return baseStyle;
+                                                            };
+
+                                                            return (
+                                                                <tr key={item.id} style={getRowStyle()}>
+                                                                    <td className="item-name" style={{
+                                                                        padding: '0.5rem',
+                                                                        textDecoration: item.status === 'unavailable' ? 'line-through' : 'none',
+                                                                        opacity: item.status === 'unavailable' ? 0.6 : 1
+                                                                    }}>{item.name}</td>
+                                                                    <td className="item-qty" style={{
+                                                                        padding: '0.5rem',
+                                                                        textAlign: 'right',
+                                                                        opacity: item.status === 'unavailable' ? 0.6 : 1
+                                                                    }}>{item.quantity}</td>
+                                                                    <td style={{ padding: '0.5rem', textAlign: 'center' }}>
+                                                                        {item.status === 'collected' && (
+                                                                            <span style={{ color: '#34d399', fontSize: '1.2rem' }} title="Collected">✓</span>
+                                                                        )}
+                                                                        {item.status === 'unavailable' && (
+                                                                            <span style={{ color: '#ef4444', fontSize: '1.2rem' }} title="Unavailable">✕</span>
+                                                                        )}
+                                                                        {!item.status && (
+                                                                            <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>-</span>
+                                                                        )}
+                                                                    </td>
+                                                                </tr>
+                                                            );
+                                                        })}
                                                     </tbody>
                                                 </table>
                                             )}

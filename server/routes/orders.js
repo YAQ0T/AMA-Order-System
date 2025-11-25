@@ -115,7 +115,7 @@ router.get('/', authenticateToken, async (req, res) => {
         const includeOptions = [
             { model: User, as: 'Maker', attributes: ['id', 'username', 'role'] },
             { model: User, as: 'AssignedTakers', attributes: ['id', 'username'], through: { attributes: [] } },
-            { model: OrderItem, as: 'Items', attributes: ['id', 'name', 'quantity'] }
+            { model: OrderItem, as: 'Items', attributes: ['id', 'name', 'quantity', 'status', 'createdAt', 'updatedAt'] }
         ];
 
         if (includeHistory) {
@@ -152,8 +152,33 @@ router.get('/', authenticateToken, async (req, res) => {
             });
         } else {
             // Takers see orders assigned to them
+            // Use a subquery to find order IDs assigned to this taker
+            const { OrderAssignments } = require('../db');
+            const assignedOrderIds = await OrderAssignments.findAll({
+                where: { userId: req.user.id },
+                attributes: ['orderId'],
+                raw: true
+            });
+
+            const orderIds = assignedOrderIds.map(a => a.orderId);
+
+            if (orderIds.length === 0) {
+                // No orders assigned to this taker
+                return res.json({
+                    orders: [],
+                    pagination: {
+                        total: 0,
+                        limit,
+                        offset
+                    }
+                });
+            }
+
             result = await Order.findAndCountAll({
-                where: { ...where, '$AssignedTakers.id$': req.user.id },
+                where: {
+                    ...where,
+                    id: { [Op.in]: orderIds }
+                },
                 include: includeOptions,
                 order: [['createdAt', 'DESC']],
                 limit,
@@ -251,10 +276,14 @@ router.put('/:id', authenticateToken, async (req, res) => {
                 const oldItemsMap = new Map(oldItems.map(i => [i.name, i.quantity]));
                 const newItemsMap = new Map(newItems.map(i => [i.name, i.quantity]));
 
+                // Track which items are updates vs additions
+                const isUpdate = new Map();
+
                 // Check for Updates and Additions
                 for (const [name, newQty] of newItemsMap) {
                     if (oldItemsMap.has(name)) {
                         const oldQty = oldItemsMap.get(name);
+                        isUpdate.set(name, true); // Mark as existing item
                         if (oldQty !== newQty) {
                             await OrderLog.create({
                                 orderId: order.id,
@@ -265,6 +294,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
                         }
                         oldItemsMap.delete(name); // processed
                     } else {
+                        isUpdate.set(name, false); // Mark as new item
                         await OrderLog.create({
                             orderId: order.id,
                             previousDescription: 'None',
@@ -284,11 +314,18 @@ router.put('/:id', authenticateToken, async (req, res) => {
                     });
                 }
 
-                // Remove old items and create new ones
+                // Preserve status: Create a map of existing items with their status
+                const existingItemsStatus = new Map(
+                    oldItems.map(item => [item.name, item.status])
+                );
+
+                // Remove old items and create new ones, preserving status only for existing items
                 await OrderItem.destroy({ where: { orderId: order.id } });
                 const orderItems = items.map(item => ({
                     ...item,
-                    orderId: order.id
+                    orderId: order.id,
+                    // Only preserve status if this item existed before (not a new addition)
+                    status: isUpdate.get(item.name) ? (existingItemsStatus.get(item.name) || null) : null
                 }));
                 await OrderItem.bulkCreate(orderItems);
             }
@@ -331,6 +368,11 @@ router.put('/:id', authenticateToken, async (req, res) => {
 
         // Handle Status Update
         if (status) {
+            // Validate entered_erp status can only be set by makers
+            if (status === 'entered_erp' && req.user.role !== 'maker' && req.user.role !== 'admin') {
+                return res.status(403).json({ error: 'Only makers can set status to "Entered into ERP"' });
+            }
+
             const oldStatus = order.status;
             order.status = status;
 

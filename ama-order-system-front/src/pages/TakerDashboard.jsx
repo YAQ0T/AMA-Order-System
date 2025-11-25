@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useOrder } from '../context/OrderContext';
+import { updateItemStatus } from '../utils/api';
 
 const TakerDashboard = () => {
     const { orders, orderPagination, updateOrderStatus, updateOrderDetails, fetchOrders } = useOrder();
@@ -31,6 +32,26 @@ const TakerDashboard = () => {
         updateOrderStatus(orderId, newStatus);
     };
 
+    // Item Status Handlers
+    const handleItemStatusChange = async (itemId, newStatus) => {
+        console.log('Updating item status:', { itemId, newStatus });
+        try {
+            const result = await updateItemStatus(itemId, newStatus);
+            console.log('Status update successful:', result);
+
+            // Small delay to ensure database transaction completes
+            await new Promise(resolve => setTimeout(resolve, 300));
+
+            console.log('About to fetch orders...');
+            // Fetch fresh data from server
+            await fetchOrders({ limit: orderPagination.limit, offset: orderPagination.offset });
+            console.log('Orders refreshed, current orders:', orders);
+        } catch (error) {
+            console.error('Failed to update item status:', error);
+            alert('Failed to update item status. Please try again.');
+        }
+    };
+
     // Edit Handlers
     const startEditing = (order) => {
         setEditingOrderId(order.id);
@@ -40,10 +61,6 @@ const TakerDashboard = () => {
 
     const handleEditAddItem = () => {
         setEditItems([...editItems, { name: '', quantity: 1 }]);
-    };
-
-    const handleEditRemoveItem = (index) => {
-        setEditItems(editItems.filter((_, i) => i !== index));
     };
 
     const handleEditItemChange = (index, field, value) => {
@@ -93,7 +110,9 @@ const TakerDashboard = () => {
                 ) : (
                     activeOrders.map(order => {
                         const isAdminOrder = order.Maker?.role === 'admin';
-                        const statusColor = order.status === 'completed' ? '#34d399' : order.status === 'in-progress' ? '#fbbf24' : '#94a3b8';
+                        const statusColor = order.status === 'completed' ? '#34d399' :
+                            order.status === 'in-progress' ? '#fbbf24' :
+                                order.status === 'entered_erp' ? '#8b5cf6' : '#94a3b8';
                         const borderColor = isAdminOrder ? '#ef4444' : statusColor;
 
                         return (
@@ -118,10 +137,14 @@ const TakerDashboard = () => {
                                             onChange={(e) => handleStatusChange(order.id, e.target.value)}
                                             className="input-field"
                                             style={{ padding: '0.3rem', fontSize: '0.9rem', width: 'auto' }}
+                                            disabled={order.status === 'entered_erp'}
                                         >
                                             <option value="pending">Pending</option>
                                             <option value="in-progress">In Progress</option>
                                             <option value="completed">Completed</option>
+                                            {order.status === 'entered_erp' && (
+                                                <option value="entered_erp">Entered into ERP</option>
+                                            )}
                                         </select>
                                         {editingOrderId !== order.id && (
                                             <button onClick={() => startEditing(order)} className="btn-secondary" style={{ padding: '0.3rem 0.8rem', fontSize: '0.8rem' }}>
@@ -165,9 +188,6 @@ const TakerDashboard = () => {
                                                         min="1"
                                                         style={{ flex: 0.5 }}
                                                     />
-                                                    <button type="button" onClick={() => handleEditRemoveItem(index)} className="btn-secondary" style={{ color: '#ef4444', borderColor: '#ef4444' }}>
-                                                        ✕
-                                                    </button>
                                                 </div>
                                             ))}
                                             <button type="button" onClick={handleEditAddItem} className="btn-secondary" style={{ alignSelf: 'flex-start', marginTop: '0.5rem' }}>
@@ -199,15 +219,80 @@ const TakerDashboard = () => {
                                                         <tr style={{ borderBottom: '1px solid var(--glass-border)', textAlign: 'left' }}>
                                                             <th style={{ padding: '0.5rem', color: 'var(--text-muted)' }}>Product</th>
                                                             <th style={{ padding: '0.5rem', color: 'var(--text-muted)', textAlign: 'right' }}>Qty</th>
+                                                            <th style={{ padding: '0.5rem', color: 'var(--text-muted)', textAlign: 'center' }}>Status</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
-                                                        {order.Items.map(item => (
-                                                            <tr key={item.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                                                                <td className="item-name" style={{ padding: '0.5rem' }}>{item.name}</td>
-                                                                <td className="item-qty" style={{ padding: '0.5rem', textAlign: 'right' }}>{item.quantity}</td>
-                                                            </tr>
-                                                        ))}
+                                                        {order.Items.map(item => {
+                                                            const getRowStyle = () => {
+                                                                const baseStyle = {
+                                                                    borderBottom: '1px solid rgba(255,255,255,0.05)',
+                                                                    transition: 'background-color 0.3s ease'
+                                                                };
+
+                                                                if (item.status === 'collected') {
+                                                                    return {
+                                                                        ...baseStyle,
+                                                                        backgroundColor: 'rgba(52, 211, 153, 0.15)',
+                                                                        borderLeft: '3px solid #34d399'
+                                                                    };
+                                                                } else if (item.status === 'unavailable') {
+                                                                    return {
+                                                                        ...baseStyle,
+                                                                        backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                                                                        borderLeft: '3px solid #ef4444'
+                                                                    };
+                                                                }
+                                                                return baseStyle;
+                                                            };
+
+                                                            return (
+                                                                <tr key={item.id} style={getRowStyle()}>
+                                                                    <td className="item-name" style={{
+                                                                        padding: '0.5rem',
+                                                                        textDecoration: item.status === 'unavailable' ? 'line-through' : 'none',
+                                                                        opacity: item.status === 'unavailable' ? 0.6 : 1
+                                                                    }}>{item.name}</td>
+                                                                    <td className="item-qty" style={{
+                                                                        padding: '0.5rem',
+                                                                        textAlign: 'right',
+                                                                        opacity: item.status === 'unavailable' ? 0.6 : 1
+                                                                    }}>{item.quantity}</td>
+                                                                    <td style={{ padding: '0.5rem', textAlign: 'center' }}>
+                                                                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                                                                            <button
+                                                                                onClick={() => handleItemStatusChange(item.id, item.status === 'collected' ? null : 'collected')}
+                                                                                className="btn-secondary"
+                                                                                style={{
+                                                                                    padding: '0.3rem 0.6rem',
+                                                                                    fontSize: '0.9rem',
+                                                                                    background: item.status === 'collected' ? '#34d399' : 'transparent',
+                                                                                    borderColor: item.status === 'collected' ? '#34d399' : 'var(--glass-border)',
+                                                                                    color: item.status === 'collected' ? '#000' : 'var(--text-main)'
+                                                                                }}
+                                                                                title="Mark as collected"
+                                                                            >
+                                                                                ✓
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={() => handleItemStatusChange(item.id, item.status === 'unavailable' ? null : 'unavailable')}
+                                                                                className="btn-secondary"
+                                                                                style={{
+                                                                                    padding: '0.3rem 0.6rem',
+                                                                                    fontSize: '0.9rem',
+                                                                                    background: item.status === 'unavailable' ? '#ef4444' : 'transparent',
+                                                                                    borderColor: item.status === 'unavailable' ? '#ef4444' : 'var(--glass-border)',
+                                                                                    color: item.status === 'unavailable' ? '#fff' : 'var(--text-main)'
+                                                                                }}
+                                                                                title="Mark as unavailable"
+                                                                            >
+                                                                                ✕
+                                                                            </button>
+                                                                        </div>
+                                                                    </td>
+                                                                </tr>
+                                                            );
+                                                        })}
                                                     </tbody>
                                                 </table>
                                             ) : (

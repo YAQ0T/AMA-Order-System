@@ -4,14 +4,38 @@ const cors = require('cors');
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
-const { sequelize, OrderAssignments, Order, User } = require('./db');
+const { sequelize, OrderAssignments, Order, User, OrderItem } = require('./db');
 const { seedAdmin } = require('./utils/seedAdmin');
 
 const app = express();
 const PORT = process.env.PORT || 3003;
 
 // Middleware
-app.use(cors());
+app.use(cors({
+    origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+
+        // List of allowed origins
+        const allowedOrigins = [
+            'http://localhost:5173',
+            'http://localhost:5174',
+            'https://localhost:5173',
+            'https://localhost:5174',
+            'http://10.10.10.110:5173',
+            'http://10.10.10.110:5174',
+            'https://10.10.10.110:5173',
+            'https://10.10.10.110:5174'
+        ];
+
+        if (allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            callback(null, true); // Allow all origins for now, but with credentials
+        }
+    },
+    credentials: true
+}));
 app.use(express.json());
 
 // Sync Database and seed admin
@@ -30,6 +54,14 @@ sequelize.sync().then(async () => {
         console.log('User table altered - email column added');
     } catch (err) {
         console.error('Error altering User table:', err);
+    }
+
+    // Alter OrderItem table to add status column
+    try {
+        await OrderItem.sync({ alter: true });
+        console.log('OrderItem table altered - status column added');
+    } catch (err) {
+        console.error('Error altering OrderItem table:', err);
     }
 
     console.log('Database synced');
