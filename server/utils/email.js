@@ -473,9 +473,106 @@ const sendBulkOrdersEmail = async (orders, taker, sender) => {
     }
 };
 
+/**
+ * Send email notification to accounter when an order is completed
+ * @param {Object} order - Completed order object
+ * @param {Object} accounter - Accounter user assigned to the order
+ */
+const sendCompletedOrderToAccounterEmail = async (order, accounter) => {
+    if (!accounter.email) return;
+
+    const itemsList = order.Items?.map(item => `- ${item.name} (Qty: ${item.quantity}${item.price ? `, Price: ${item.price} ₪` : ''})`).join('\n') || 'No items';
+
+    const mailOptions = {
+        from: `"AMA Order System" <${process.env.EMAIL_USER}>`,
+        to: accounter.email,
+        subject: `✅ New Completed Order Ready for Review: ${order.title}`,
+        html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f9fafb; padding: 20px;">
+                <div style="background: white; border-radius: 12px; padding: 30px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                    <h2 style="color: #10b981; margin-top: 0; border-bottom: 3px solid #10b981; padding-bottom: 10px;">
+                        ✅ New Completed Order Ready for Review
+                    </h2>
+                    
+                    <p style="font-size: 16px; color: #374151;">Hello <strong>${accounter.username}</strong>,</p>
+                    <p style="color: #6b7280;">A new completed order has been assigned to you and is ready for review.</p>
+                    
+                    <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #10b981;">
+                        <h3 style="margin-top: 0; color: #1f2937;">📋 Order Details</h3>
+                        
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <tr>
+                                <td style="padding: 8px 0; color: #6b7280; width: 40%;"><strong>Order ID:</strong></td>
+                                <td style="padding: 8px 0; color: #1f2937;">#${order.id}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; color: #6b7280;"><strong>Customer Name:</strong></td>
+                                <td style="padding: 8px 0; color: #1f2937;">${order.title}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; color: #6b7280;"><strong>City:</strong></td>
+                                <td style="padding: 8px 0; color: #1f2937;">${order.city || 'Not specified'}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; color: #6b7280;"><strong>Status:</strong></td>
+                                <td style="padding: 8px 0;">
+                                    <span style="background: #d1fae5; color: #065f46; padding: 4px 12px; border-radius: 12px; font-size: 14px;">
+                                        Completed
+                                    </span>
+                                </td>
+                            </tr>
+                            ${order.description ? `
+                            <tr>
+                                <td style="padding: 8px 0; color: #6b7280;"><strong>Note:</strong></td>
+                                <td style="padding: 8px 0; color: #1f2937;">${order.description}</td>
+                            </tr>
+                            ` : ''}
+                        </table>
+                        
+                        <h4 style="margin-top: 20px; margin-bottom: 10px; color: #1f2937;">📦 Items:</h4>
+                        <div style="background: white; padding: 15px; border-radius: 6px; font-family: monospace; font-size: 14px; color: #374151;">
+                            ${itemsList.replace(/\n/g, '<br>')}
+                        </div>
+                    </div>
+                    
+                    <div style="background: #ecfdf5; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                        <p style="margin: 0; color: #065f46;">
+                            <strong>👤 Created by:</strong> ${order.Maker?.username || 'Unknown'}
+                        </p>
+                        <p style="margin: 10px 0 0 0; color: #065f46;">
+                            <strong>🕐 Completed at:</strong> ${new Date().toLocaleString('en-US', {
+            timeZone: 'Asia/Jerusalem',
+            dateStyle: 'full',
+            timeStyle: 'short'
+        })}
+                        </p>
+                    </div>
+                    
+                    <p style="margin-top: 25px; font-size: 15px; color: #374151;">
+                        Please log in to the system to review this order and mark it as entered to ERP when ready.
+                    </p>
+                </div>
+                
+                <hr style="margin: 20px 0; border: none; border-top: 1px solid #e5e7eb;">
+                <p style="color: #9ca3af; font-size: 12px; text-align: center;">
+                    This is an automated message from AMA Order System. Please do not reply to this email.
+                </p>
+            </div>
+        `
+    };
+
+    try {
+        await transporter.sendMail(mailOptions);
+        console.log(`Completed order email sent to accounter ${accounter.email}`);
+    } catch (error) {
+        console.error(`Failed to send email to accounter ${accounter.email}:`, error);
+    }
+};
+
 module.exports = {
     sendOrderCreatedEmail,
     sendOrderUpdatedEmail,
     sendOrderUpdatedByTakerEmail,
-    sendBulkOrdersEmail
+    sendBulkOrdersEmail,
+    sendCompletedOrderToAccounterEmail
 };

@@ -2,7 +2,7 @@ const express = require('express');
 const { Order, User, OrderItem, OrderLog, Notification, sequelize } = require('../db');
 const { authenticateToken } = require('../middleware/auth');
 const { sendPushNotification } = require('../utils/push');
-const { sendOrderCreatedEmail, sendOrderUpdatedEmail, sendOrderUpdatedByTakerEmail, sendBulkOrdersEmail } = require('../utils/email');
+const { sendOrderCreatedEmail, sendOrderUpdatedEmail, sendOrderUpdatedByTakerEmail, sendBulkOrdersEmail, sendCompletedOrderToAccounterEmail } = require('../utils/email');
 const { Op } = require('sequelize');
 
 const router = express.Router();
@@ -533,6 +533,29 @@ router.put('/:id', authenticateToken, async (req, res) => {
                     type: 'info',
                     orderId: order.id
                 });
+            }
+
+            // If status changes to 'completed' and there's an assigned accounter, notify them
+            if (status === 'completed' && oldStatus !== 'completed' && order.accounterId) {
+                await Notification.create({
+                    userId: order.accounterId,
+                    message: `New completed order ready for review: Order #${order.id} - ${order.title || 'Untitled Order'}`,
+                    type: 'alert',
+                    orderId: order.id
+                });
+
+                // Send push notification
+                sendPushNotification(order.accounterId, {
+                    title: 'New Completed Order',
+                    body: `Order #${order.id}: ${order.title || 'Untitled Order'} is ready for review`,
+                    url: `/`
+                });
+
+                // Send email notification to accounter
+                const accounter = await User.findByPk(order.accounterId);
+                if (accounter) {
+                    await sendCompletedOrderToAccounterEmail(order, accounter);
+                }
             }
         }
 
