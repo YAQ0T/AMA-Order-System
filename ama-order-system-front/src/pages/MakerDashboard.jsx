@@ -71,7 +71,7 @@ const MakerDashboard = () => {
     const [searchDate, setSearchDate] = useState('');
 
     // Archiving & Bulk Send State
-    const [showArchived, setShowArchived] = useState(false);
+    const [orderFilter, setOrderFilter] = useState('active');
     const [selectedArchivedOrders, setSelectedArchivedOrders] = useState([]); // Array of order IDs
     const [bulkSendCity, setBulkSendCity] = useState(null); // City currently being bulk sent
     const [showBulkSendModal, setShowBulkSendModal] = useState(false);
@@ -331,10 +331,17 @@ const MakerDashboard = () => {
 
     // Filter Orders
     const filteredOrders = orders.filter(order => {
-        if (showArchived) {
+        if (orderFilter === 'archived') {
             return order.status === 'archived';
         }
-        return order.status !== 'archived';
+        if (orderFilter === 'completed') {
+            return order.status === 'completed';
+        }
+        if (orderFilter === 'entered_erp') {
+            return order.status === 'entered_erp';
+        }
+        // Active orders exclude archived and completed entries
+        return order.status !== 'archived' && order.status !== 'completed';
     }).filter(order => {
         const searchLower = searchTerm.toLowerCase();
         const matchesTitle = (order.title || '').toLowerCase().includes(searchLower);
@@ -348,7 +355,7 @@ const MakerDashboard = () => {
 
     // Group Archived Orders by City
     const archivedOrdersByCity = useMemo(() => {
-        if (!showArchived) return {};
+        if (orderFilter !== 'archived') return {};
         const grouped = {};
         filteredOrders.forEach(order => {
             const city = order.city || 'Unspecified';
@@ -356,7 +363,14 @@ const MakerDashboard = () => {
             grouped[city].push(order);
         });
         return grouped;
-    }, [filteredOrders, showArchived]);
+    }, [filteredOrders, orderFilter]);
+
+    const handleSendToErp = async (order) => {
+        const confirmed = window.confirm('Are you sure you want to send this order to ERP?');
+        if (!confirmed) return;
+
+        await updateOrderStatus(order.id, 'entered_erp');
+    };
 
     return (
         <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
@@ -512,19 +526,33 @@ const MakerDashboard = () => {
             )}
             <div style={{ marginTop: '3rem' }}>
                 {/* Orders List */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                    <div style={{ display: 'flex', gap: '1rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                    <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                         <button
-                            className={`btn-secondary ${!showArchived ? 'active' : ''}`}
-                            onClick={() => setShowArchived(false)}
-                            style={{ borderColor: !showArchived ? 'var(--primary)' : undefined }}
+                            className={`btn-secondary ${orderFilter === 'active' ? 'active' : ''}`}
+                            onClick={() => setOrderFilter('active')}
+                            style={{ borderColor: orderFilter === 'active' ? 'var(--primary)' : undefined }}
                         >
                             Active Orders
                         </button>
                         <button
-                            className={`btn-secondary ${showArchived ? 'active' : ''}`}
-                            onClick={() => setShowArchived(true)}
-                            style={{ borderColor: showArchived ? 'var(--primary)' : undefined }}
+                            className={`btn-secondary ${orderFilter === 'completed' ? 'active' : ''}`}
+                            onClick={() => setOrderFilter('completed')}
+                            style={{ borderColor: orderFilter === 'completed' ? 'var(--primary)' : undefined }}
+                        >
+                            ✅ Completed Orders
+                        </button>
+                        <button
+                            className={`btn-secondary ${orderFilter === 'entered_erp' ? 'active' : ''}`}
+                            onClick={() => setOrderFilter('entered_erp')}
+                            style={{ borderColor: orderFilter === 'entered_erp' ? 'var(--primary)' : undefined }}
+                        >
+                            🧾 Entered to ERP Orders
+                        </button>
+                        <button
+                            className={`btn-secondary ${orderFilter === 'archived' ? 'active' : ''}`}
+                            onClick={() => setOrderFilter('archived')}
+                            style={{ borderColor: orderFilter === 'archived' ? 'var(--primary)' : undefined }}
                         >
                             📂 Archived Orders
                         </button>
@@ -548,7 +576,7 @@ const MakerDashboard = () => {
                     </div>
                 </div>
 
-                {showArchived ? (
+                {orderFilter === 'archived' ? (
                     <div style={{ display: 'grid', gap: '2rem' }}>
                         {Object.entries(archivedOrdersByCity).map(([city, cityOrders]) => {
                             const selectedInCity = cityOrders.filter(o => selectedArchivedOrders.includes(o.id));
@@ -672,45 +700,57 @@ const MakerDashboard = () => {
                     <div style={{ display: 'grid', gap: '1.5rem' }}>
                         {filteredOrders.length === 0 ? (
                             <div className="glass-panel" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-                                <p>No active orders found matching your criteria.</p>
+                                <p>No orders found matching your criteria.</p>
                             </div>
                         ) : (
                             filteredOrders.map(order => (
                                 <div key={order.id} className="glass-panel" style={{ padding: '1.5rem' }}>
-                                    <div className="order-header" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
-                                        <span style={{ fontFamily: 'monospace', background: 'rgba(255,255,255,0.1)', padding: '0.2rem 0.5rem', borderRadius: '4px' }}>
-                                            #{String(order.id).padStart(6, '0')}
-                                        </span>
-                                        {editingOrderId === order.id ? (
-                                            <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                                <input
-                                                    type="text"
-                                                    className="input-field"
-                                                    value={editTitle}
-                                                    onChange={(e) => setEditTitle(e.target.value)}
-                                                    placeholder="Customer name"
-                                                    style={{ padding: '0.2rem 0.5rem', fontSize: '1rem' }}
-                                                />
-                                                <select
-                                                    className="input-field"
-                                                    value={editCity}
-                                                    onChange={(e) => setEditCity(e.target.value)}
-                                                    style={{ padding: '0.2rem 0.5rem', fontSize: '1rem', width: '120px' }}
-                                                >
-                                                    {cities.map(c => (
-                                                        <option key={c} value={c}>{c}</option>
-                                                    ))}
-                                                </select>
-                                            </div>
-                                        ) : (
-                                            <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                                <span style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>{order.title || 'Untitled Order'}</span>
-                                                {order.city && (
-                                                    <span style={{ fontSize: '0.8rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
-                                                        🏙️ {order.city}
-                                                    </span>
-                                                )}
-                                            </div>
+                                    <div className="order-header" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem', gap: '1rem' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
+                                            <span style={{ fontFamily: 'monospace', background: 'rgba(255,255,255,0.1)', padding: '0.2rem 0.5rem', borderRadius: '4px' }}>
+                                                #{String(order.id).padStart(6, '0')}
+                                            </span>
+                                            {editingOrderId === order.id ? (
+                                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                    <input
+                                                        type="text"
+                                                        className="input-field"
+                                                        value={editTitle}
+                                                        onChange={(e) => setEditTitle(e.target.value)}
+                                                        placeholder="Customer name"
+                                                        style={{ padding: '0.2rem 0.5rem', fontSize: '1rem' }}
+                                                    />
+                                                    <select
+                                                        className="input-field"
+                                                        value={editCity}
+                                                        onChange={(e) => setEditCity(e.target.value)}
+                                                        style={{ padding: '0.2rem 0.5rem', fontSize: '1rem', width: '120px' }}
+                                                    >
+                                                        {cities.map(c => (
+                                                            <option key={c} value={c}>{c}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            ) : (
+                                                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                    <span style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>{order.title || 'Untitled Order'}</span>
+                                                    {order.city && (
+                                                        <span style={{ fontSize: '0.8rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                                                            🏙️ {order.city}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                        {editingOrderId !== order.id && (
+                                            <button
+                                                className="btn-primary"
+                                                onClick={() => handleSendToErp(order)}
+                                                disabled={order.status === 'entered_erp' || order.status === 'archived'}
+                                                style={{ padding: '0.4rem 0.75rem', fontSize: '0.85rem' }}
+                                            >
+                                                {order.status === 'entered_erp' ? 'Entered to ERP' : 'Send to ERP'}
+                                            </button>
                                         )}
                                     </div>
                                     <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
