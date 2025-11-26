@@ -612,6 +612,7 @@ const AdminDashboard = () => {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                     {editItems.map((item, idx) => (
                         <div key={`edit-${idx}`} style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                            <span style={{ minWidth: '20px', fontWeight: 'bold', color: 'var(--text-muted)' }}>{idx + 1}.</span>
                             <input
                                 className="input-field"
                                 placeholder="Name"

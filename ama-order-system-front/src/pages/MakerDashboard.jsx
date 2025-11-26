@@ -545,6 +545,7 @@ const MakerDashboard = () => {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                             {items.map((item, index) => (
                                 <div key={index} style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                                    <span style={{ minWidth: '20px', fontWeight: 'bold', color: 'var(--text-muted)' }}>{index + 1}.</span>
                                     <input
                                         type="text"
                                         className="input-field"
@@ -1022,6 +1023,7 @@ const MakerDashboard = () => {
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem' }}>
                                                 {editItems.map((item, index) => (
                                                     <div key={index} style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                                                        <span style={{ minWidth: '20px', fontWeight: 'bold', color: 'var(--text-muted)' }}>{index + 1}.</span>
                                                         <input
                                                             type="text"
                                                             className="input-field"

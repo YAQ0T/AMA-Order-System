@@ -144,7 +144,11 @@ module.exports = { app, sequelize };
 const startServer = async () => {
     const httpsOptions = {
         key: fs.readFileSync(path.join(__dirname, 'certs', 'key.pem')),
-        cert: fs.readFileSync(path.join(__dirname, 'certs', 'cert.pem'))
+        cert: fs.readFileSync(path.join(__dirname, 'certs', 'cert.pem')),
+        // mTLS Configuration
+        ca: fs.readFileSync(path.join(__dirname, 'certs', 'ca-cert.pem')), // Load our custom CA
+        requestCert: true, // Ask for client certificate
+        rejectUnauthorized: true // Reject if no valid cert is provided
     };
 
     const portToUse = await findAvailablePort(PREFERRED_PORT);
@@ -154,8 +158,9 @@ const startServer = async () => {
     }
 
     https.createServer(httpsOptions, app).listen(portToUse, '0.0.0.0', () => {
-        console.log(`HTTPS Server running on https://localhost:${portToUse}`);
+        console.log(`🔒 HTTPS Server running on https://localhost:${portToUse} (mTLS Enabled)`);
         console.log(`Also accessible at https://10.10.10.110:${portToUse}`);
+        console.log('⚠️  Access restricted to devices with valid client certificate');
     });
 };
 
