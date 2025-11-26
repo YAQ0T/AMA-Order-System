@@ -1,4 +1,4 @@
-const DEFAULT_API_PORT = '3003';
+const DEFAULT_API_PORT = '3004';
 
 const normalizeBaseUrl = (url) => {
     if (!url) return null;

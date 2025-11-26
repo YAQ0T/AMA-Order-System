@@ -437,3 +437,68 @@ button {
     font-size: 0.8rem;
   }
 }
+
+/* Print Styles */
+@media print {
+  /* Hide everything except printable content */
+  body * {
+    visibility: hidden;
+  }
+
+  #printable-orders,
+  #printable-orders * {
+    visibility: visible;
+  }
+
+  #printable-orders {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    display: block !important;
+  }
+
+  /* Remove backgrounds and use black text for better printing */
+  body {
+    background: white;
+    color: black;
+  }
+
+  /* Ensure page breaks work correctly */
+  .printable-order-page {
+    page-break-after: always;
+  }
+
+  .printable-order-page:last-child {
+    page-break-after: auto;
+  }
+
+  /* Hide navigation, buttons, and other UI elements */
+  nav,
+  button,
+  .btn-primary,
+  .btn-secondary,
+  header,
+  footer,
+  .glass-panel:not(#printable-orders .glass-panel) {
+    display: none !important;
+  }
+
+  /* Optimize table printing */
+  table {
+    page-break-inside: auto;
+  }
+
+  tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  tfoot {
+    display: table-footer-group;
+  }
+}

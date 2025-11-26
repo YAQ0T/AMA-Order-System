@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../utils/api';
+import PrintableOrder from '../components/PrintableOrder';
 
 const AdminDashboard = () => {
     const { token } = useAuth();
@@ -45,7 +46,10 @@ const AdminDashboard = () => {
 
     // Email editing
     const [editingEmailUserId, setEditingEmailUserId] = useState(null);
-    const [editingEmail, setEditingEmail] = useState('');
+    const [editingEmailValue, setEditingEmailValue] = useState('');
+
+    // Print State
+    const [ordersToPrint, setOrdersToPrint] = useState([]);
 
     const fetchProductSuggestions = async (query) => {
         if (!query || query.length < 2) {
@@ -86,7 +90,7 @@ const AdminDashboard = () => {
     // Start editing email
     const startEditingEmail = (user) => {
         setEditingEmailUserId(user.id);
-        setEditingEmail(user.email || '');
+        setEditingEmailValue(user.email || '');
     };
 
     // Save email
@@ -98,13 +102,13 @@ const AdminDashboard = () => {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify({ email: editingEmail })
+                body: JSON.stringify({ email: editingEmailValue })
             });
 
             if (res.ok) {
                 alert('Email updated successfully!');
                 setEditingEmailUserId(null);
-                setEditingEmail('');
+                setEditingEmailValue('');
                 fetchUsers();
             } else {
                 const data = await res.json();
@@ -540,11 +544,20 @@ const AdminDashboard = () => {
 
     const getRoleBadgeColor = (role) => {
         switch (role) {
-            case 'admin': return '#ec4899';
-            case 'maker': return '#6366f1';
-            case 'taker': return '#22c55e';
-            default: return '#94a3b8';
+            case 'admin': return 'var(--primary)';
+            case 'maker': return 'var(--accent)';
+            case 'taker': return '#10b981';
+            default: return 'var(--text-muted)';
         }
+    };
+
+    // Print Handlers
+    const handlePrintOrder = (order) => {
+        setOrdersToPrint([order]);
+        setTimeout(() => {
+            window.print();
+            setOrdersToPrint([]);
+        }, 100);
     };
 
     const getStatusColor = (status) => {
@@ -647,6 +660,9 @@ const AdminDashboard = () => {
                 <button className="btn-secondary" onClick={() => setEditingOrderId(null)}>Cancel</button>
                 <button className="btn-primary" onClick={() => saveEdit(order.id)}>Save Changes</button>
             </div>
+
+            {/* Printable Orders */}
+            <PrintableOrder orders={ordersToPrint} />
         </div>
     );
 
@@ -674,6 +690,7 @@ const AdminDashboard = () => {
             </div>
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
                 <button className="btn-secondary" onClick={() => startEditing(order)}>Edit Order</button>
+                <button className="btn-secondary" onClick={() => handlePrintOrder(order)} style={{ borderColor: 'var(--primary)', color: 'var(--primary)' }}>🖨️ Print</button>
                 <button className="btn-danger" onClick={() => deleteOrder(order.id)}>
                     Delete Order
                 </button>
@@ -1139,6 +1156,7 @@ const AdminDashboard = () => {
                                                                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                                                                     <button className="btn-secondary" onClick={() => setViewOrder(order)}>View</button>
                                                                     <button className="btn-secondary" onClick={() => startEditing(order)}>Edit</button>
+                                                                    <button className="btn-secondary" onClick={() => handlePrintOrder(order)} style={{ borderColor: 'var(--primary)', color: 'var(--primary)' }}>🖨️ Print</button>
                                                                     <button className="btn-danger" onClick={() => deleteOrder(order.id)}>Delete</button>
                                                                 </div>
                                                                 {editingOrderId === order.id && (

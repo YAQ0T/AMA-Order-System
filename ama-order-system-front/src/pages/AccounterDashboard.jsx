@@ -1,10 +1,16 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useOrder } from '../context/OrderContext';
+import PrintableOrder from '../components/PrintableOrder';
 
 const AccounterDashboard = () => {
     const { orders, orderPagination, fetchOrders, updateOrderStatus } = useOrder();
     const [filterStatus, setFilterStatus] = useState('all'); // 'all', 'completed', 'entered_erp'
     const filterStatusRef = useRef(filterStatus);
+
+    // New states for print functionality and search date
+    const [searchDate, setSearchDate] = useState('');
+    const [ordersToPrint, setOrdersToPrint] = useState([]);
 
     // Keep ref in sync with state
     useEffect(() => {
@@ -45,6 +51,15 @@ const AccounterDashboard = () => {
         fetchOrders({ limit, offset: (newPage - 1) * limit, status: statusParam });
     };
 
+    // Print Handler
+    const handlePrintOrder = (order) => {
+        setOrdersToPrint([order]);
+        setTimeout(() => {
+            window.print();
+            setOrdersToPrint([]);
+        }, 100);
+    };
+
     const start = totalOrders === 0 ? 0 : (orderPagination.offset || 0) + 1;
     const end = totalOrders === 0 ? 0 : Math.min(totalOrders, (orderPagination.offset || 0) + limit);
 
@@ -57,19 +72,19 @@ const AccounterDashboard = () => {
                 </div>
                 <div style={{ display: 'flex', gap: '1rem' }}>
                     <button
-                        className={`btn ${filterStatus === 'all' ? 'btn-primary' : 'btn-secondary'}`}
+                        className={`btn ${filterStatus === 'all' ? 'btn-primary' : 'btn-secondary'} `}
                         onClick={() => setFilterStatus('all')}
                     >
                         All
                     </button>
                     <button
-                        className={`btn ${filterStatus === 'completed' ? 'btn-primary' : 'btn-secondary'}`}
+                        className={`btn ${filterStatus === 'completed' ? 'btn-primary' : 'btn-secondary'} `}
                         onClick={() => setFilterStatus('completed')}
                     >
                         Completed
                     </button>
                     <button
-                        className={`btn ${filterStatus === 'entered_erp' ? 'btn-primary' : 'btn-secondary'}`}
+                        className={`btn ${filterStatus === 'entered_erp' ? 'btn-primary' : 'btn-secondary'} `}
                         onClick={() => setFilterStatus('entered_erp')}
                     >
                         Entered to ERP
@@ -113,7 +128,7 @@ const AccounterDashboard = () => {
                     completedOrders.map(order => {
                         const statusColor = order.status === 'entered_erp' ? '#8b5cf6' : '#34d399';
                         return (
-                            <div key={order.id} className="glass-panel" style={{ padding: '1.5rem', borderLeft: `4px solid ${statusColor}` }}>
+                            <div key={order.id} className="glass-panel" style={{ padding: '1.5rem', borderLeft: `4px solid ${statusColor} ` }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem', alignItems: 'center' }}>
                                     <div>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
@@ -132,9 +147,12 @@ const AccounterDashboard = () => {
                                             {order.status === 'entered_erp' ? 'Entered to ERP' : 'Completed'}
                                         </span>
                                         {order.status === 'completed' && (
-                                            <button className="btn-primary" onClick={() => handleEnterErp(order.id)}>
-                                                Mark Entered to ERP
-                                            </button>
+                                            <>
+                                                <button className="btn-secondary" onClick={() => handlePrintOrder(order)} style={{ borderColor: 'var(--primary)', color: 'var(--primary)' }}>🖨️ Print</button>
+                                                <button className="btn-primary" onClick={() => handleEnterErp(order.id)}>
+                                                    Mark Entered to ERP
+                                                </button>
+                                            </>
                                         )}
                                     </div>
                                 </div>
@@ -199,6 +217,9 @@ const AccounterDashboard = () => {
                     })
                 )}
             </div>
+
+            {/* Printable Orders */}
+            <PrintableOrder orders={ordersToPrint} />
         </div>
     );
 };

@@ -3,6 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { useOrder } from '../context/OrderContext';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../utils/api';
+import PrintableOrder from '../components/PrintableOrder';
 
 // Simple Modal Component
 const ConfirmModal = ({ isOpen, onClose, onConfirm, title, message }) => {
@@ -93,6 +94,7 @@ const MakerDashboard = () => {
     const [editItems, setEditItems] = useState([]);
     const [editSelectedTakers, setEditSelectedTakers] = useState([]);
     const [editAccounter, setEditAccounter] = useState(null);
+    const [editStatus, setEditStatus] = useState('');
     const [expandedHistoryId, setExpandedHistoryId] = useState(null);
 
     const [searchTerm, setSearchTerm] = useState('');
@@ -105,6 +107,9 @@ const MakerDashboard = () => {
     const [showBulkSendModal, setShowBulkSendModal] = useState(false);
     const [bulkSendTakers, setBulkSendTakers] = useState([]);
     const [bulkSendAccounter, setBulkSendAccounter] = useState(null);
+
+    // Print State
+    const [ordersToPrint, setOrdersToPrint] = useState([]);
 
     // Product & Title Suggestions
     const [productSuggestions, setProductSuggestions] = useState([]);
@@ -237,7 +242,8 @@ const MakerDashboard = () => {
             city: editCity,
             items: editItems,
             assignedTakerIds: editSelectedTakers,
-            accounterId: editAccounter || null
+            accounterId: editAccounter || null,
+            status: editStatus
         });
         if (success) {
             setEditingOrderId(null);
@@ -246,6 +252,7 @@ const MakerDashboard = () => {
             setEditItems([]);
             setEditSelectedTakers([]);
             setEditAccounter(null);
+            setEditStatus('');
         }
     };
 
@@ -256,6 +263,7 @@ const MakerDashboard = () => {
         setEditItems(order.Items ? order.Items.map(i => ({ name: i.name, quantity: i.quantity, price: i.price ?? '' })) : []);
         setEditSelectedTakers(order.AssignedTakers ? order.AssignedTakers.map(t => t.id) : []);
         setEditAccounter(order.Accounter?.id || null);
+        setEditStatus(order.status || 'pending');
     };
 
     const toggleTaker = (takerId) => {
@@ -443,6 +451,28 @@ const MakerDashboard = () => {
     const handlePageChange = (page) => {
         const newPage = Math.min(Math.max(page, 1), totalPages);
         fetchOrders({ limit, offset: (newPage - 1) * limit });
+    };
+
+    // Print Handlers
+    const handlePrintOrder = (order) => {
+        setOrdersToPrint([order]);
+        setTimeout(() => {
+            window.print();
+            setOrdersToPrint([]);
+        }, 100);
+    };
+
+    const handlePrintSelected = () => {
+        const selectedOrders = orders.filter(o => selectedArchivedOrders.includes(o.id));
+        if (selectedOrders.length === 0) {
+            alert('Please select orders to print.');
+            return;
+        }
+        setOrdersToPrint(selectedOrders);
+        setTimeout(() => {
+            window.print();
+            setOrdersToPrint([]);
+        }, 100);
     };
 
     return (
@@ -740,6 +770,14 @@ const MakerDashboard = () => {
                                                 {selectedInCity.length === cityOrders.length ? 'Deselect All' : 'Select All'}
                                             </button>
                                             <button
+                                                className="btn-secondary"
+                                                disabled={selectedInCity.length === 0}
+                                                onClick={handlePrintSelected}
+                                                style={{ borderColor: 'var(--primary)', color: 'var(--primary)' }}
+                                            >
+                                                🖨️ Print Selected ({selectedInCity.length})
+                                            </button>
+                                            <button
                                                 className="btn-primary"
                                                 disabled={selectedInCity.length === 0}
                                                 onClick={() => initiateBulkSend(city)}
@@ -845,6 +883,7 @@ const MakerDashboard = () => {
                                                                 {order.Items?.length || 0} items • Created {new Date(order.createdAt).toLocaleDateString()}
                                                             </div>
                                                         </div>
+                                                        <button className="btn-secondary" onClick={() => handlePrintOrder(order)} style={{ borderColor: 'var(--primary)', color: 'var(--primary)' }}>🖨️ Print</button>
                                                         <button className="btn-secondary" onClick={() => startEditing(order)}>Edit</button>
                                                         <button className="btn-danger" onClick={() => handleDeleteClick(order)}>Delete</button>
                                                     </div>
@@ -925,8 +964,8 @@ const MakerDashboard = () => {
                                             </span>
                                         ) : (
                                             <select
-                                                value={order.status}
-                                                onChange={(e) => updateOrderStatus(order.id, e.target.value)}
+                                                value={editStatus}
+                                                onChange={(e) => setEditStatus(e.target.value)}
                                                 style={{
                                                     padding: '0.3rem 0.5rem',
                                                     borderRadius: '4px',
@@ -947,6 +986,9 @@ const MakerDashboard = () => {
                                         </span>
                                         {editingOrderId !== order.id && (
                                             <>
+                                                <button className="btn-secondary" onClick={() => handlePrintOrder(order)} style={{ padding: '0.2rem 0.5rem', fontSize: '0.8rem', borderColor: 'var(--primary)', color: 'var(--primary)' }}>
+                                                    🖨️ Print
+                                                </button>
                                                 <button onClick={() => startEditing(order)} className="btn-secondary" style={{ padding: '0.2rem 0.5rem', fontSize: '0.8rem' }}>
                                                     Edit
                                                 </button>
@@ -1288,6 +1330,9 @@ const MakerDashboard = () => {
                     title="Delete Order"
                     message={`Are you sure you want to delete order #${orderToDelete?.id}? This action cannot be undone.`}
                 />
+
+                {/* Printable Orders */}
+                <PrintableOrder orders={ordersToPrint} />
             </div>
         </div>
     );
