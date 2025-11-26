@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تثبيت شهادات الأمان - AMA System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 500px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 24px;
+            text-align: center;
+        }
+        
+        .subtitle {
+            color: #666;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .step {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-right: 4px solid #667eea;
+        }
+        
+        .step-number {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 30px;
+            margin-left: 10px;
+            font-weight: bold;
+        }
+        
+        .step-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #333;
+        }
+        
+        .step-desc {
+            color: #666;
+            margin-bottom: 15px;
+            line-height: 1.6;
+        }
+        
+        .download-btn {
+            display: block;
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 10px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 16px;
+            transition: transform 0.2s;
+            border: none;
+            cursor: pointer;
+        }
+        
+        .download-btn:active {
+            transform: scale(0.98);
+        }
+        
+        .warning {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 20px;
+            color: #856404;
+        }
+        
+        .warning strong {
+            display: block;
+            margin-bottom: 5px;
+        }
+        
+        .password {
+            background: #e7f3ff;
+            border: 2px solid #2196F3;
+            border-radius: 8px;
+            padding: 10px;
+            margin: 10px 0;
+            text-align: center;
+            font-family: monospace;
+            font-size: 18px;
+            font-weight: bold;
+            color: #1976D2;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 تثبيت شهادات الأمان</h1>
+        <p class="subtitle">نظام إدارة الطلبات - AMA</p>
+        
+        <div class="step">
+            <div class="step-title">
+                <span class="step-number">1</span>
+                تثبيت شهادة CA (الختم الرئيسي)
+            </div>
+            <div class="step-desc">
+                حمّل هذا الملف أولاً، ثم روح Settings → Profile Downloaded → Install
+            </div>
+            <a href="certs/ca-cert.pem" download class="download-btn">
+                📥 تحميل CA Certificate
+            </a>
+        </div>
+        
+        <div class="step">
+            <div class="step-title">
+                <span class="step-number">2</span>
+                تفعيل الثقة الكاملة
+            </div>
+            <div class="step-desc">
+                بعد التثبيت، روح:<br>
+                Settings → General → About → Certificate Trust Settings<br>
+                وفعّل "Enable Full Trust" لشهادة AMA Root CA
+            </div>
+        </div>
+        
+        <div class="step">
+            <div class="step-title">
+                <span class="step-number">3</span>
+                تثبيت شهادة الموظف
+            </div>
+            <div class="step-desc">
+                حمّل هذا الملف وثبته. رح يطلب منك كلمة سر:
+            </div>
+            <div class="password">123456</div>
+            <a href="certs/ama-access.p12" download class="download-btn">
+                📥 تحميل Employee Certificate
+            </a>
+        </div>
+        
+        <div class="warning">
+            <strong>⚠️ مهم جداً:</strong>
+            لازم تثبت الشهادتين بالترتيب (CA أولاً، ثم Employee) عشان يشتغل النظام.
+        </div>
+    </div>
+</body>
+</html>

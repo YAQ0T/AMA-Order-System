@@ -143,8 +143,8 @@ module.exports = { app, sequelize };
 
 const startServer = async () => {
     const httpsOptions = {
-        key: fs.readFileSync(path.join(__dirname, 'certs', 'key.pem')),
-        cert: fs.readFileSync(path.join(__dirname, 'certs', 'cert.pem')),
+        key: fs.readFileSync(path.join(__dirname, 'certs', 'server-key-new.pem')),
+        cert: fs.readFileSync(path.join(__dirname, 'certs', 'server-cert-new.pem')),
         // mTLS Configuration
         ca: fs.readFileSync(path.join(__dirname, 'certs', 'ca-cert.pem')), // Load our custom CA
         requestCert: true, // Ask for client certificate
