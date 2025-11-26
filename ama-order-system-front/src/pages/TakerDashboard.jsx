@@ -32,6 +32,7 @@ const TakerDashboard = () => {
     const [editingOrderId, setEditingOrderId] = useState(null);
     const [editTitle, setEditTitle] = useState('');
     const [editItems, setEditItems] = useState([]);
+    const [editingItemId, setEditingItemId] = useState(null);
 
     const handleStatusChange = (orderId, newStatus) => {
         updateOrderStatus(orderId, newStatus);
@@ -70,11 +71,21 @@ const TakerDashboard = () => {
     };
 
     // Edit Handlers
-    const startEditing = (order) => {
+    const startEditing = (order, targetItemId = null) => {
         setEditingOrderId(order.id);
         setEditTitle(order.title || '');
-        setEditItems(order.Items ? order.Items.map(i => ({ name: i.name, quantity: i.quantity })) : []);
+        setEditItems(order.Items ? order.Items.map(i => ({ id: i.id, name: i.name, quantity: i.quantity })) : []);
+        setEditingItemId(targetItemId);
     };
+
+    React.useEffect(() => {
+        if (!editingOrderId || !editingItemId) return;
+
+        const input = document.getElementById(`edit-item-${editingOrderId}-${editingItemId}`);
+        if (input) {
+            input.focus();
+        }
+    }, [editingOrderId, editingItemId, editItems]);
 
     const handleEditAddItem = () => {
         setEditItems([...editItems, { name: '', quantity: 1 }]);
@@ -88,13 +99,19 @@ const TakerDashboard = () => {
 
     const handleUpdate = async (orderId) => {
         if (window.confirm("Warning: You are modifying the Maker's order. Are you sure?")) {
-            const success = await updateOrderDetails(orderId, { title: editTitle, items: editItems });
+            const itemsPayload = editItems.map(({ name, quantity, price }) => ({ name, quantity, price }));
+            const success = await updateOrderDetails(orderId, { title: editTitle, items: itemsPayload });
             if (success) {
-                setEditingOrderId(null);
-                setEditTitle('');
-                setEditItems([]);
+                cancelEditing();
             }
         }
+    };
+
+    const cancelEditing = () => {
+        setEditingOrderId(null);
+        setEditTitle('');
+        setEditItems([]);
+        setEditingItemId(null);
     };
 
     return (
@@ -214,13 +231,14 @@ const TakerDashboard = () => {
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1rem' }}>
                                             <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem' }}>Items</label>
                                             {editItems.map((item, index) => (
-                                                <div key={index} style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                                                <div key={item.id || index} style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                                                     <input
                                                         type="text"
                                                         className="input-field"
                                                         placeholder="Product Name"
                                                         value={item.name}
                                                         onChange={(e) => handleEditItemChange(index, 'name', e.target.value)}
+                                                        id={item.id ? `edit-item-${order.id}-${item.id}` : undefined}
                                                         style={{ flex: 2 }}
                                                     />
                                                     <input
@@ -243,7 +261,7 @@ const TakerDashboard = () => {
                                             <button onClick={() => handleUpdate(order.id)} className="btn-primary" style={{ padding: '0.5rem 1rem', background: '#fbbf24', color: '#000' }}>
                                                 ⚠️ Save Changes
                                             </button>
-                                            <button onClick={() => setEditingOrderId(null)} className="btn-secondary" style={{ padding: '0.5rem 1rem' }}>Cancel</button>
+                                            <button onClick={cancelEditing} className="btn-secondary" style={{ padding: '0.5rem 1rem' }}>Cancel</button>
                                         </div>
                                     </div>
                                 ) : (
@@ -264,6 +282,7 @@ const TakerDashboard = () => {
                                                             <th style={{ padding: '0.5rem', color: 'var(--text-muted)' }}>Product</th>
                                                             <th style={{ padding: '0.5rem', color: 'var(--text-muted)', textAlign: 'right' }}>Qty</th>
                                                             <th style={{ padding: '0.5rem', color: 'var(--text-muted)', textAlign: 'center' }}>Status</th>
+                                                            <th style={{ padding: '0.5rem', color: 'var(--text-muted)', textAlign: 'center' }}>Edit</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
@@ -336,6 +355,16 @@ const TakerDashboard = () => {
                                                                                     ✕
                                                                                 </button>
                                                                             </div>
+                                                                        </td>
+                                                                        <td style={{ padding: '0.5rem', textAlign: 'center' }}>
+                                                                            <button
+                                                                                onClick={() => startEditing(order, item.id)}
+                                                                                className="btn-secondary"
+                                                                                style={{ padding: '0.3rem 0.5rem', fontSize: '0.9rem' }}
+                                                                                title="Edit this product"
+                                                                            >
+                                                                                ✏️
+                                                                            </button>
                                                                         </td>
                                                                     </tr>
                                                                 );

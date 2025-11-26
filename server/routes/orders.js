@@ -2,7 +2,7 @@ const express = require('express');
 const { Order, User, OrderItem, OrderLog, Notification, sequelize } = require('../db');
 const { authenticateToken } = require('../middleware/auth');
 const { sendPushNotification } = require('../utils/push');
-const { sendOrderCreatedEmail, sendOrderUpdatedEmail, sendOrderUpdatedByTakerEmail, sendBulkOrdersEmail, sendCompletedOrderToAccounterEmail } = require('../utils/email');
+const { sendOrderCreatedEmail, sendOrderUpdatedEmail, sendBulkOrdersEmail, sendCompletedOrderToAccounterEmail } = require('../utils/email');
 const { Op } = require('sequelize');
 
 const router = express.Router();
@@ -612,12 +612,6 @@ router.put('/:id', authenticateToken, async (req, res) => {
                 });
             }
 
-            // If Taker updated, notify Maker
-            if (req.user.role === 'taker' && updatedOrder.Maker) {
-                sendOrderUpdatedByTakerEmail(updatedOrder, updatedOrder.Maker, editor, recentChanges).catch(err => {
-                    console.error('Error sending order updated email to maker:', err);
-                });
-            }
         }
 
         res.json(updatedOrder);
