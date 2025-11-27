@@ -58,7 +58,10 @@ app.use(cors({
             'https://10.10.10.110:5173',
             'https://10.10.10.110:5174',
             'http://213.6.226.163:5173',
-            'https://213.6.226.163:5173'
+            'https://213.6.226.163:5173',
+            'https://amaorders.work:5173',
+            'https://amaorders.work:5174',
+            'https://www.amaorders.work:5173'
         ];
 
         if (allowedOrigins.indexOf(origin) !== -1) {
@@ -70,6 +73,10 @@ app.use(cors({
     credentials: true
 }));
 app.use(express.json());
+
+// Certificate Authentication Middleware - DISABLED
+// const { validateClientCertificate } = require('./middleware/certificateAuth');
+// app.use(validateClientCertificate);
 
 // Sync Database and seed admin
 const syncDatabase = async () => {
@@ -143,8 +150,12 @@ module.exports = { app, sequelize };
 
 const startServer = async () => {
     const httpsOptions = {
-        key: fs.readFileSync(path.join(__dirname, 'certs', 'key.pem')),
-        cert: fs.readFileSync(path.join(__dirname, 'certs', 'cert.pem'))
+        key: fs.readFileSync(path.join(__dirname, 'certs', 'server-key.pem')),
+        cert: fs.readFileSync(path.join(__dirname, 'certs', 'server-cert.pem'))
+        // Client certificate authentication disabled
+        // ca: fs.readFileSync(path.join(__dirname, 'certs', 'ca-cert.pem')),
+        // requestCert: true,
+        // rejectUnauthorized: true
     };
 
     const portToUse = await findAvailablePort(PREFERRED_PORT);
@@ -156,6 +167,7 @@ const startServer = async () => {
     https.createServer(httpsOptions, app).listen(portToUse, '0.0.0.0', () => {
         console.log(`HTTPS Server running on https://localhost:${portToUse}`);
         console.log(`Also accessible at https://10.10.10.110:${portToUse}`);
+        console.log(`Multi-domain certificate active for: 10.10.10.110, 213.6.226.163`);
     });
 };
 

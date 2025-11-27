@@ -99,8 +99,8 @@ const Signup = () => {
                     Already have an account? <Link to="/login" style={{ color: 'var(--primary)' }}>Log In</Link>
                 </p>
                 <p style={{ marginTop: '1rem', textAlign: 'center', fontSize: '0.9rem' }}>
-                    <a href="/install-cert.html" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-muted)', textDecoration: 'underline' }}>
-                        📱 Install iOS Certificate
+                    <a href={`${window.location.origin}/install-employee-cert.html`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-muted)', textDecoration: 'underline' }}>
+                        📱 Install Employee Certificate
                     </a>
                 </p>
             </div>

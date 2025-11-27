@@ -1,86 +1,187 @@
-# Installing SSL Certificate on iPhone for Home Screen App
+d# Installing SSL Certificates on iPhone for AMA Order System
 
-## Problem
-When you add the AMA Order System to your iPhone home screen, it runs in standalone mode and doesn't recognize the certificate you accepted in Safari. This causes "Load Failed" errors.
+## Overview
 
-## Solution: Install Certificate System-Wide on iPhone
+The AMA Order System now uses **multi-domain SSL certificates** and requires **employee certificates** for security. This guide will help you install the necessary certificates on your iPhone.
 
-### Step 1: Get the Certificate File
+## What You Need to Install
 
-The certificate file is located at:
-```
-/Users/yaqot/Desktop/AMA Order System/ama-order-system-front/certs/cert.crt
-```
+1. **CA Certificate** (`ca-cert.crt`) - Allows your device to trust the server
+2. **Employee Certificate** (`employee-cert.p12`) - Required for access (password: `ama2024`)
 
-### Step 2: Transfer Certificate to iPhone
+## Supported Endpoints
 
-Choose one of these methods:
+After installation, you can access the application without warnings on:
 
-**Option A: AirDrop (Easiest)**
-1. On your Mac, locate the file: `AMA Order System/ama-order-system-front/certs/cert.crt`
-2. Right-click → Share → AirDrop
-3. Select your iPhone
+**Frontend (Production):**
+- `https://10.10.10.110:5174`
+- `https://213.6.226.163:5174`
 
-**Option B: Email**
-1. Email the `cert.crt` file to yourself
-2. Open the email on your iPhone
-3. Tap the attachment
+**Frontend (Development):**
+- `https://10.10.10.110:5173`
+- `https://213.6.226.163:5173`
 
-**Option C: Host it temporarily**
-You can also access it via: `https://10.10.10.56:5173/cert.crt` (if we copy it to the public folder)
+**Backend:**
+- `https://10.10.10.110:3004`
+- `https://213.6.226.163:3004`
+- `https://10.10.10.110:5001`
+- `https://213.6.226.163:5001`
 
-### Step 3: Install the Certificate on iPhone
+---
 
-1. **Open the certificate file** on your iPhone
-   - You'll see a warning: "Profile Downloaded"
-   - Tap **Close**
+## Installation Steps
 
-2. **Go to Settings** → **General** → **VPN & Device Management**
-   - You should see the certificate under "Downloaded Profile"
-   - Tap on it
-   - Tap **Install** (top right)
-   - Enter your iPhone passcode if prompted
-   - Tap **Install** again (confirmation)
-   - Tap **Install** one more time
-   - Tap **Done**
+### Step 1: Download Certificates
 
-3. **Enable Full Trust for the Certificate**
-   - Go to **Settings** → **General** → **About**
-   - Scroll down to **Certificate Trust Settings**
-   - Find your certificate in the list
-   - Toggle the switch to **ON** (green)
-   - Tap **Continue** on the warning dialog
+**Option A: Download from Server (Easiest)**
+1. Open Safari on your iPhone
+2. Go to: `https://10.10.10.110:5174/install-employee-cert.html`
+3. Download both certificates from the page
 
-### Step 4: Add App to Home Screen
+**Option B: AirDrop from Mac**
+1. On your Mac, locate the files in: `/Users/yaqot/Documents/AMA-Order-System/certs/`
+2. AirDrop both `ca-cert.crt` and `employee-cert.p12` to your iPhone
 
-1. Open Safari and go to `https://10.10.10.56:5173`
+**Option C: Direct Download**
+1. Go to: `https://10.10.10.110:5174/ca-cert.crt`
+2. Go to: `https://10.10.10.110:5174/employee-cert.p12`
+
+### Step 2: Install CA Certificate
+
+1. After downloading `ca-cert.crt`, you'll see **"Profile Downloaded"**
+2. Tap **Close**
+3. Go to **Settings** → **General** → **VPN & Device Management**
+4. Under "Downloaded Profile", tap **AMA Root CA**
+5. Tap **Install** (top right)
+6. Enter your iPhone passcode
+7. Tap **Install** again (confirmation)
+8. Tap **Install** one more time
+9. Tap **Done**
+
+### Step 3: Install Employee Certificate
+
+1. After downloading `employee-cert.p12`, you'll see **"Profile Downloaded"**
+2. Tap **Close**
+3. Go to **Settings** → **General** → **VPN & Device Management**
+4. Under "Downloaded Profile", tap **AMA Employee Certificate**
+5. Tap **Install** (top right)
+6. Enter your iPhone passcode
+7. **Enter certificate password: `ama2024`**
+8. Tap **Install** again (confirmation)
+9. Tap **Install** one more time
+10. Tap **Done**
+
+### Step 4: Enable Full Trust for CA Certificate
+
+> **⚠️ CRITICAL STEP - The app will NOT work without this!**
+
+1. Go to **Settings** → **General** → **About**
+2. Scroll down to **Certificate Trust Settings**
+3. Find **AMA Root CA** in the list
+4. Toggle the switch to **ON** (green)
+5. Tap **Continue** on the warning dialog
+
+### Step 5: Access the Application
+
+You can now access the application at any of these URLs:
+- **Production**: `https://10.10.10.110:5174` or `https://213.6.226.163:5174`
+- **Development**: `https://10.10.10.110:5173` or `https://213.6.226.163:5173`
+
+### Step 6: Add to Home Screen (Optional)
+
+1. Open Safari and go to your preferred application URL
 2. Tap the **Share** button (square with arrow)
 3. Scroll down and tap **Add to Home Screen**
-4. Name it "AMA Orders" or whatever you prefer
+4. Name it "AMA Orders"
 5. Tap **Add**
 
-### Step 5: Test the Home Screen App
+The home screen app will now work perfectly without any certificate warnings!
 
-1. Tap the app icon on your home screen
-2. It should now load without "Load Failed" errors!
+---
 
 ## Troubleshooting
 
-**Still getting "Load Failed"?**
-- Make sure you completed Step 3.3 (Certificate Trust Settings)
-- Try restarting your iPhone
-- Delete the home screen app and add it again
+### "Client certificate required" Error
 
-**Can't find Certificate Trust Settings?**
-- Make sure you installed the profile first (Step 3.2)
+**Problem**: You see an error message saying a client certificate is required.
+
+**Solution**: Make sure you've installed the **employee certificate** (employee-cert.p12), not just the CA certificate. Both are required.
+
+### "Invalid client certificate" Error
+
+**Problem**: You see an error saying your certificate is not authorized.
+
+**Solution**: 
+- Verify you installed the correct employee certificate
+- Make sure you entered the password correctly (`ama2024`)
+- Try reinstalling the employee certificate
+- Contact IT support if the problem persists
+
+### Still Getting "Load Failed" in Home Screen App?
+
+**Solutions**:
+1. Make sure you completed **Step 4** (Certificate Trust Settings)
+2. Try restarting your iPhone
+3. Delete the home screen app and add it again
+4. Verify both certificates are installed in Settings → VPN & Device Management
+
+### Can't Find Certificate Trust Settings?
+
+**Solution**:
+- Make sure you installed the CA certificate first (Step 2)
 - The Certificate Trust Settings only appears after installing a profile
+- Restart your iPhone and check again
 
-**Certificate not showing in VPN & Device Management?**
-- Try transferring the file again
-- Make sure you're opening the `.crt` file, not the `.pem` file
+### Certificate Not Showing in VPN & Device Management?
 
-## Alternative: Use HTTP Instead
+**Solutions**:
+- Try downloading the files again
+- Make sure you're opening the correct files:
+  - CA certificate: `.crt` file
+  - Employee certificate: `.p12` file
+- Try using a different download method (AirDrop vs direct download)
 
-If you don't want to install certificates, you can temporarily switch to HTTP for local development (less secure):
-- This would require modifying the Vite config to disable HTTPS
-- Not recommended for production use
+### Browser Still Shows Security Warning?
+
+**Solutions**:
+1. Verify you enabled trust in Certificate Trust Settings
+2. Make sure you're accessing the correct URLs (listed above)
+3. Clear Safari cache: Settings → Safari → Clear History and Website Data
+4. Restart Safari
+
+---
+
+## Security Notes
+
+> **🔒 Keep Your Employee Certificate Secure!**
+> - Do not share your employee certificate with anyone
+> - Do not install it on non-work devices
+> - If your device is lost or stolen, immediately contact IT support
+
+> **⏰ Certificate Validity**
+> - Certificates are valid for 10 years
+> - You will be notified when renewal is needed
+
+---
+
+## Alternative: Use the Installation Web Page
+
+For the easiest installation experience, visit:
+`https://10.10.10.110:5174/install-employee-cert.html`
+
+This page provides:
+- Direct download links for both certificates
+- Platform-specific installation instructions
+- Interactive guide for your device type
+
+---
+
+## Need More Help?
+
+For detailed installation instructions for other platforms (macOS, Windows, Android), see:
+- **EMPLOYEE_CERTIFICATE_SETUP.md** - Comprehensive guide for all platforms
+
+For IT support, contact the IT department with:
+- Your device type
+- The exact error message
+- Screenshots if possible
