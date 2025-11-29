@@ -161,6 +161,7 @@ const AccounterDashboard = () => {
                                     <table className="order-items-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
                                         <thead>
                                             <tr style={{ borderBottom: '1px solid var(--glass-border)', textAlign: 'left' }}>
+                                                <th style={{ padding: '0.5rem', color: 'var(--text-muted)', width: '40px' }}>#</th>
                                                 <th style={{ padding: '0.5rem', color: 'var(--text-muted)' }}>Product</th>
                                                 <th style={{ padding: '0.5rem', color: 'var(--text-muted)', textAlign: 'center' }}>Status</th>
                                                 <th style={{ padding: '0.5rem', color: 'var(--text-muted)', textAlign: 'right' }}>Qty</th>
@@ -168,7 +169,7 @@ const AccounterDashboard = () => {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {order.Items.map(item => {
+                                            {order.Items.map((item, index) => {
                                                 const getRowStyle = () => {
                                                     const baseStyle = {
                                                         borderBottom: '1px solid rgba(255,255,255,0.05)',
@@ -194,6 +195,7 @@ const AccounterDashboard = () => {
 
                                                 return (
                                                     <tr key={item.id} style={getRowStyle()}>
+                                                        <td style={{ padding: '0.5rem', color: 'var(--text-muted)' }}>{index + 1}</td>
                                                         <td style={{ padding: '0.5rem' }}>{item.name}</td>
                                                         <td style={{ padding: '0.5rem', textAlign: 'center' }}>
                                                             {item.status === 'collected' ? (

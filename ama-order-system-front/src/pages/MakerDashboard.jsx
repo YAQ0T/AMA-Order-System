@@ -545,6 +545,7 @@ const MakerDashboard = () => {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                             {items.map((item, index) => (
                                 <div key={index} style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                                    <span style={{ color: 'var(--text-muted)', minWidth: '20px', textAlign: 'right' }}>{index + 1}.</span>
                                     <input
                                         type="text"
                                         className="input-field"
@@ -827,6 +828,7 @@ const MakerDashboard = () => {
                                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                                                             {editItems.map((item, index) => (
                                                                 <div key={index} style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                                                                    <span style={{ color: 'var(--text-muted)', minWidth: '20px', textAlign: 'right' }}>{index + 1}.</span>
                                                                     <input
                                                                         type="text"
                                                                         className="input-field"
@@ -1130,6 +1132,7 @@ const MakerDashboard = () => {
                                                 <table className="order-items-table" style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '1rem' }}>
                                                     <thead>
                                                         <tr style={{ borderBottom: '1px solid var(--glass-border)', textAlign: 'left' }}>
+                                                            <th style={{ padding: '0.5rem', color: 'var(--text-muted)', width: '40px' }}>#</th>
                                                             <th style={{ padding: '0.5rem', color: 'var(--text-muted)' }}>Product</th>
                                                             <th style={{ padding: '0.5rem', color: 'var(--text-muted)', textAlign: 'right' }}>Qty</th>
                                                             <th style={{ padding: '0.5rem', color: 'var(--text-muted)', textAlign: 'right' }}>Price</th>
@@ -1137,7 +1140,7 @@ const MakerDashboard = () => {
                                                         </tr>
                                                     </thead>
                                                     <tbody>
-                                                        {order.Items.map(item => {
+                                                        {order.Items.map((item, index) => {
                                                             const getRowStyle = () => {
                                                                 const baseStyle = {
                                                                     borderBottom: '1px solid rgba(255,255,255,0.05)',
@@ -1162,6 +1165,7 @@ const MakerDashboard = () => {
 
                                                             return (
                                                                 <tr key={item.id} style={getRowStyle()}>
+                                                                    <td style={{ padding: '0.5rem', color: 'var(--text-muted)' }}>{index + 1}</td>
                                                                     <td className="item-name" style={{
                                                                         padding: '0.5rem',
                                                                         textDecoration: item.status === 'unavailable' ? 'line-through' : 'none',

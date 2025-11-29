@@ -674,9 +674,9 @@ const AdminDashboard = () => {
             <div>
                 <strong>Items:</strong>
                 <ul style={{ margin: '0.5rem 0 0 1rem', padding: 0 }}>
-                    {(order.Items || []).map(item => (
+                    {(order.Items || []).map((item, index) => (
                         <li key={`${order.id}-${item.name}`} style={{ color: 'var(--text-muted)' }}>
-                            {item.name} - Qty: {item.quantity}
+                            {index + 1}. {item.name} - Qty: {item.quantity}
                         </li>
                     ))}
                     {(order.Items || []).length === 0 && (
@@ -1317,9 +1317,9 @@ const AdminDashboard = () => {
                             <div>
                                 <strong>Items:</strong>
                                 <ul style={{ margin: '0.5rem 0 0 1rem', padding: 0 }}>
-                                    {(viewOrder.Items || []).map(item => (
+                                    {(viewOrder.Items || []).map((item, index) => (
                                         <li key={`${viewOrder.id}-${item.name}`} style={{ color: 'var(--text-muted)' }}>
-                                            {item.name} - Qty: {item.quantity}
+                                            {index + 1}. {item.name} - Qty: {item.quantity}
                                         </li>
                                     ))}
                                     {(viewOrder.Items || []).length === 0 && (
